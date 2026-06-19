@@ -172,7 +172,7 @@ export default function LiveAnalysisScreen() {
         const p = pt(i)
         ctx.beginPath()
         ctx.arc(p.x, p.y, 5, 0, Math.PI * 2)
-        ctx.fillStyle = '#6366f1'
+        ctx.fillStyle = '#4f46e5'
         ctx.fill()
       }
 
@@ -350,8 +350,8 @@ export default function LiveAnalysisScreen() {
               { color: '#22c55e', label: 'Good form' },
               { color: '#f59e0b', label: 'Near threshold' },
               { color: '#ef4444', label: 'Risk detected' },
-              { color: '#6366f1', label: 'Joints' },
-              { color: 'rgba(255,255,255,0.5)', label: 'Skeleton' },
+              { color: '#4f46e5', label: 'Joints' },
+              { color: 'rgba(79,70,229,0.40)', label: 'Skeleton' },
             ].map(({ color, label }) => (
               <span key={label} className="flex items-center gap-1.5">
                 <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: color }} />

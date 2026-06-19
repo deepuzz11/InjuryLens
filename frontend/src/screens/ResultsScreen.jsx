@@ -203,8 +203,8 @@ function FrameGallery({ annotated_frame, annotated_frames, movementType }) {
 
       <div className="mt-2 flex flex-wrap gap-3 text-xs text-text-muted">
         {[
-          { color: '#6366f1', label: 'Joints' },
-          { color: 'rgba(255,255,255,0.5)', label: 'Skeleton', pill: true },
+          { color: '#4f46e5', label: 'Joints' },
+          { color: 'rgba(79,70,229,0.35)', label: 'Skeleton', pill: true },
           { color: '#22c55e', label: 'Low ≤30%' },
           { color: '#f59e0b', label: 'Mod. 31–60%' },
           { color: '#ef4444', label: 'High >60%' },

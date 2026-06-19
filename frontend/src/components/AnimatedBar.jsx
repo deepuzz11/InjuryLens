@@ -52,7 +52,7 @@ export default function AnimatedBar({ score, label, subtitle, delay = 0 }) {
       {/* Animated bar */}
       <div
         className="h-2 rounded-full overflow-hidden"
-        style={{ background: 'rgba(255,255,255,0.06)' }}
+        style={{ background: 'rgba(15,23,42,0.08)' }}
         role="progressbar"
         aria-valuenow={safeScore}
         aria-valuemin={0}

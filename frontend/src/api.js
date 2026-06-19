@@ -1,4 +1,6 @@
-const API_BASE = 'http://localhost:8000'
+// Empty base so every request goes through Vite's dev proxy (/analyze → localhost:8000).
+// In production, deploy the frontend on the same origin as the API or set VITE_API_URL.
+const API_BASE = import.meta.env.VITE_API_URL ?? ''
 const TIMEOUT_MS = 90_000
 
 function getSuggestion(status) {

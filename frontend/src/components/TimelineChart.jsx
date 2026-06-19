@@ -124,7 +124,7 @@ export default function TimelineChart({ data = [] }) {
 
       <ResponsiveContainer width="100%" height={200}>
         <LineChart data={chartData} margin={{ top: 4, right: 8, left: -24, bottom: 0 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
+          <CartesianGrid strokeDasharray="3 3" stroke="rgba(15,23,42,0.07)" />
           <XAxis
             dataKey="frame"
             tick={{ fill: '#475569', fontSize: 10 }}
@@ -146,7 +146,7 @@ export default function TimelineChart({ data = [] }) {
             </>
           )}
           {mode === 'velocity' && (
-            <ReferenceLine y={0} stroke="rgba(255,255,255,0.15)" strokeWidth={1} />
+            <ReferenceLine y={0} stroke="rgba(15,23,42,0.15)" strokeWidth={1} />
           )}
           {lines.map((l) =>
             isActive(l.key) ? (

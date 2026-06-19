@@ -9,7 +9,7 @@ const AGE_GROUPS     = ['Under 18', '18–24', '25–34', '35–44', '45–54', 
 const GOALS          = ['Injury Prevention', 'Performance Improvement', 'Rehabilitation', 'General Fitness', 'Sport-Specific Training']
 const SPORTS         = ['', 'Football', 'Basketball', 'Tennis', 'Running/Athletics', 'Swimming', 'Cycling', 'CrossFit', 'Weightlifting', 'Rugby', 'Martial Arts', 'Other']
 
-const AVATAR_COLORS = ['#6366f1', '#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444', '#ec4899', '#14b8a6']
+const AVATAR_COLORS = ['#4f46e5', '#7c3aed', '#0891b2', '#059669', '#d97706', '#dc2626', '#db2777', '#0d9488']
 
 function ProfileForm({ initial, onSave, onCancel }) {
   const [name,         setName]         = useState(initial?.name ?? '')

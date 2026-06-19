@@ -21,7 +21,7 @@ export default function PDFExportButton({ results, targetRef }) {
       const canvas = await html2canvas(element, {
         scale: 1.5,
         useCORS: true,
-        backgroundColor: '#0f0f1a',
+        backgroundColor: '#f8fafc',
         logging: false,
         ignoreElements: (el) => el.classList?.contains('pdf-exclude'),
       })
@@ -33,27 +33,27 @@ export default function PDFExportButton({ results, targetRef }) {
       const imgW   = pageW - margin * 2
       const imgH   = (canvas.height * imgW) / canvas.width
 
-      // Header
-      pdf.setFillColor(15, 15, 26)
+      // Header — deep indigo on white
+      pdf.setFillColor(79, 70, 229)
       pdf.rect(0, 0, pageW, 18, 'F')
-      pdf.setTextColor(99, 102, 241)
+      pdf.setTextColor(255, 255, 255)
       pdf.setFontSize(14)
       pdf.setFont('helvetica', 'bold')
       pdf.text('InjuryLens', margin, 12)
-      pdf.setTextColor(148, 163, 184)
+      pdf.setTextColor(224, 220, 255)
       pdf.setFontSize(8)
       pdf.setFont('helvetica', 'normal')
       pdf.text('AI Movement Analysis Report', margin + 32, 12)
       pdf.text(new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }), pageW - margin, 12, { align: 'right' })
 
-      // Risk summary line
+      // Risk summary line — light surface
       const overall   = results?.scores?.overall ?? 0
       const riskLevel = results?.ai_coaching?.overall_risk_level ?? 'Unknown'
-      pdf.setFillColor(20, 20, 35)
+      pdf.setFillColor(241, 245, 249)
       pdf.rect(0, 18, pageW, 10, 'F')
       pdf.setFontSize(9)
       pdf.setFont('helvetica', 'bold')
-      pdf.setTextColor(255, 255, 255)
+      pdf.setTextColor(15, 23, 42)
       pdf.text(`${results?.movement_type ?? ''} Analysis`, margin, 25)
       const riskColors = { Low: [34, 197, 94], Moderate: [245, 158, 11], High: [239, 68, 68] }
       const [r, g, b] = riskColors[riskLevel] ?? [148, 163, 184]

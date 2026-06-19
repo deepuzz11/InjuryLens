@@ -13,7 +13,7 @@ import Navbar from '../components/Navbar'
 import GamificationPanel from '../components/GamificationPanel'
 
 const COLORS = {
-  overall:           '#6366f1',
+  overall:           '#4f46e5',
   knee_valgus_left:  '#f59e0b',
   knee_valgus_right: '#f97316',
   trunk_lean:        '#ec4899',
@@ -177,17 +177,17 @@ export default function DashboardScreen() {
             <AreaChart data={chartData} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
               <defs>
                 <linearGradient id="overallGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%"  stopColor="#6366f1" stopOpacity={0.25} />
-                  <stop offset="95%" stopColor="#6366f1" stopOpacity={0.02} />
+                  <stop offset="5%"  stopColor="#4f46e5" stopOpacity={0.25} />
+                  <stop offset="95%" stopColor="#4f46e5" stopOpacity={0.02} />
                 </linearGradient>
               </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
+              <CartesianGrid strokeDasharray="3 3" stroke="rgba(15,23,42,0.07)" />
               <XAxis dataKey="name" tick={{ fill: '#475569', fontSize: 11 }} axisLine={false} tickLine={false} />
               <YAxis domain={[0, 100]} tick={{ fill: '#475569', fontSize: 11 }} axisLine={false} tickLine={false} />
               <Tooltip content={<CustomTooltip />} />
               <ReferenceLine y={30} stroke="#22c55e" strokeDasharray="4 4" strokeOpacity={0.4} label={{ value: 'Low', fill: '#22c55e', fontSize: 10, position: 'right' }} />
               <ReferenceLine y={60} stroke="#f59e0b" strokeDasharray="4 4" strokeOpacity={0.4} label={{ value: 'Moderate', fill: '#f59e0b', fontSize: 10, position: 'right' }} />
-              <Area type="monotone" dataKey="overall" name="Overall" stroke="#6366f1" strokeWidth={2} fill="url(#overallGrad)" dot={{ fill: '#6366f1', r: 4 }} activeDot={{ r: 6 }} />
+              <Area type="monotone" dataKey="overall" name="Overall" stroke="#4f46e5" strokeWidth={2} fill="url(#overallGrad)" dot={{ fill: '#4f46e5', r: 4 }} activeDot={{ r: 6 }} />
             </AreaChart>
           </ResponsiveContainer>
         </motion.div>
@@ -206,7 +206,7 @@ export default function DashboardScreen() {
             </div>
             <ResponsiveContainer width="100%" height={220}>
               <LineChart data={chartData} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(15,23,42,0.07)" />
                 <XAxis dataKey="name" tick={{ fill: '#475569', fontSize: 11 }} axisLine={false} tickLine={false} />
                 <YAxis domain={[0, 100]} tick={{ fill: '#475569', fontSize: 11 }} axisLine={false} tickLine={false} />
                 <Tooltip content={<CustomTooltip />} />

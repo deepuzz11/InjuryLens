@@ -64,7 +64,7 @@ export default function RiskGauge({ score, level }) {
       <path
         d={arcPath(startAngle, endAngle)}
         fill="none"
-        stroke="rgba(255,255,255,0.06)"
+        stroke="rgba(15,23,42,0.10)"
         strokeWidth="10"
         strokeLinecap="round"
       />
@@ -76,7 +76,7 @@ export default function RiskGauge({ score, level }) {
         stroke="#22c55e"
         strokeWidth="10"
         strokeLinecap="round"
-        opacity="0.35"
+        opacity="0.45"
       />
 
       {/* Amber zone 30–60% */}
@@ -86,7 +86,7 @@ export default function RiskGauge({ score, level }) {
         stroke="#f59e0b"
         strokeWidth="10"
         strokeLinecap="round"
-        opacity="0.35"
+        opacity="0.45"
       />
 
       {/* Red zone 60–100% */}
@@ -96,7 +96,7 @@ export default function RiskGauge({ score, level }) {
         stroke="#ef4444"
         strokeWidth="10"
         strokeLinecap="round"
-        opacity="0.35"
+        opacity="0.45"
       />
 
       {/* Animated needle */}

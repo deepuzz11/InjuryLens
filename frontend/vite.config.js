@@ -6,8 +6,9 @@ export default defineConfig({
   server: {
     port: 5173,
     proxy: {
-      '/analyze': 'http://localhost:8000',
-      '/health':  'http://localhost:8000',
+      '/analyze':   'http://localhost:8000',
+      '/health':    'http://localhost:8000',
+      '/movements': 'http://localhost:8000',
     },
     headers: {
       // Required for SharedArrayBuffer used by some WASM runtimes

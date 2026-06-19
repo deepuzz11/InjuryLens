@@ -15,9 +15,9 @@ const GUIDES = {
         {/* Floor */}
         <line x1="20" y1="145" x2="200" y2="145" stroke="#334155" strokeWidth="2" />
         {/* Camera */}
-        <rect x="20" y="60" width="28" height="20" rx="4" fill="#6366f1" opacity="0.8" />
-        <circle cx="34" cy="70" r="6" fill="#0f0f1a" stroke="#818cf8" strokeWidth="1.5" />
-        <line x1="48" y1="70" x2="110" y2="90" stroke="#6366f1" strokeDasharray="4 3" strokeWidth="1.5" opacity="0.6" />
+        <rect x="20" y="60" width="28" height="20" rx="4" fill="#4f46e5" opacity="0.8" />
+        <circle cx="34" cy="70" r="6" fill="#1e293b" stroke="#7c3aed" strokeWidth="1.5" />
+        <line x1="48" y1="70" x2="110" y2="90" stroke="#4f46e5" strokeDasharray="4 3" strokeWidth="1.5" opacity="0.6" />
         {/* Person squatting */}
         <circle cx="140" cy="50" r="12" fill="none" stroke="#94a3b8" strokeWidth="2" />
         <line x1="140" y1="62" x2="140" y2="95" stroke="#94a3b8" strokeWidth="2" />
@@ -35,8 +35,8 @@ const GUIDES = {
         <line x1="48" y1="150" x2="130" y2="150" stroke="#22c55e" strokeWidth="1.5" markerEnd="url(#arr)" />
         <text x="89" y="158" fill="#22c55e" fontSize="8" textAnchor="middle">2–3 m</text>
         {/* Angle arc */}
-        <path d="M 55 70 A 20 20 0 0 1 70 55" stroke="#818cf8" strokeWidth="1.5" fill="none" />
-        <text x="68" y="52" fill="#818cf8" fontSize="8">45°</text>
+        <path d="M 55 70 A 20 20 0 0 1 70 55" stroke="#7c3aed" strokeWidth="1.5" fill="none" />
+        <text x="68" y="52" fill="#7c3aed" fontSize="8">45°</text>
       </svg>
     ),
   },

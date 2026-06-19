@@ -30,18 +30,18 @@ function StreakRing({ streak, goal = 7 }) {
   return (
     <div className="flex flex-col items-center gap-1">
       <svg width={92} height={92} viewBox="0 0 92 92">
-        <circle cx={46} cy={46} r={R} fill="none" stroke="#1e2030" strokeWidth={8} />
+        <circle cx={46} cy={46} r={R} fill="none" stroke="rgba(15,23,42,0.10)" strokeWidth={8} />
         <circle
           cx={46} cy={46} r={R}
           fill="none"
-          stroke={streak >= goal ? '#f59e0b' : '#6366f1'}
+          stroke={streak >= goal ? '#d97706' : '#4f46e5'}
           strokeWidth={8}
           strokeDasharray={circ}
           strokeDashoffset={dashOffset}
           strokeLinecap="round"
           style={{ transform: 'rotate(-90deg)', transformOrigin: '50% 50%', transition: 'stroke-dashoffset 0.6s ease' }}
         />
-        <text x={46} y={50} textAnchor="middle" fill="#f1f5f9" fontSize={24} fontWeight="bold" fontFamily="monospace">
+        <text x={46} y={50} textAnchor="middle" fill="#0f172a" fontSize={24} fontWeight="bold" fontFamily="monospace">
           {streak}
         </text>
         <text x={46} y={64} textAnchor="middle" fill="#64748b" fontSize={10} fontFamily="system-ui">
@@ -93,7 +93,7 @@ export default function GamificationPanel() {
           <div className="h-2 rounded-full bg-bg-elevated overflow-hidden">
             <motion.div
               className="h-full rounded-full"
-              style={{ background: weeklyPct >= 1 ? '#22c55e' : '#6366f1' }}
+              style={{ background: weeklyPct >= 1 ? '#16a34a' : '#4f46e5' }}
               initial={{ width: 0 }}
               animate={{ width: `${weeklyPct * 100}%` }}
               transition={{ duration: 0.7, ease: 'easeOut' }}

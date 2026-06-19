@@ -4,7 +4,7 @@ import { Award } from 'lucide-react'
 
 const GRADE_COLORS = {
   A: { text: 'text-success',  bg: 'bg-success/15',  border: 'border-success/30',  ring: '#22c55e' },
-  B: { text: 'text-accent-primary', bg: 'bg-accent-primary/15', border: 'border-accent-primary/30', ring: '#6366f1' },
+  B: { text: 'text-accent-primary', bg: 'bg-accent-primary/15', border: 'border-accent-primary/30', ring: '#4f46e5' },
   C: { text: 'text-warning',  bg: 'bg-warning/15',  border: 'border-warning/30',  ring: '#f59e0b' },
   D: { text: 'text-orange-400', bg: 'bg-orange-400/15', border: 'border-orange-400/30', ring: '#fb923c' },
   F: { text: 'text-danger',   bg: 'bg-danger/15',   border: 'border-danger/30',   ring: '#ef4444' },
@@ -26,7 +26,7 @@ function MQSRing({ score, grade }) {
 
   return (
     <svg width={104} height={104} viewBox="0 0 104 104">
-      <circle cx={52} cy={52} r={R} fill="none" stroke="#1e2030" strokeWidth={9} />
+      <circle cx={52} cy={52} r={R} fill="none" stroke="rgba(15,23,42,0.10)" strokeWidth={9} />
       <motion.circle
         cx={52} cy={52} r={R}
         fill="none"
@@ -39,7 +39,7 @@ function MQSRing({ score, grade }) {
         transition={{ duration: 1.0, ease: 'easeOut' }}
         style={{ transform: 'rotate(-90deg)', transformOrigin: '50% 50%' }}
       />
-      <text x={52} y={48} textAnchor="middle" fill="#f1f5f9" fontSize={26} fontWeight="bold" fontFamily="monospace">
+      <text x={52} y={48} textAnchor="middle" fill="#0f172a" fontSize={26} fontWeight="bold" fontFamily="monospace">
         {grade}
       </text>
       <text x={52} y={64} textAnchor="middle" fill="#64748b" fontSize={10} fontFamily="system-ui">

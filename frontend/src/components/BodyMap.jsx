@@ -57,38 +57,38 @@ export default function BodyMap({ scores = {} }) {
         {/* ── Skeleton ── */}
 
         {/* Head */}
-        <circle cx="60" cy="30" r="16" fill="none" stroke="#6366f1" strokeWidth="2.5" />
+        <circle cx="60" cy="30" r="16" fill="none" stroke="#4f46e5" strokeWidth="2.5" />
 
         {/* Neck */}
-        <line x1="60" y1="46" x2="60" y2="58" stroke="#94a3b8" strokeWidth="2" />
+        <line x1="60" y1="46" x2="60" y2="58" stroke="#64748b" strokeWidth="2" />
 
         {/* Shoulders */}
-        <line x1="60" y1="62" x2="34" y2="75" stroke="#94a3b8" strokeWidth="2" />
-        <line x1="60" y1="62" x2="86" y2="75" stroke="#94a3b8" strokeWidth="2" />
+        <line x1="60" y1="62" x2="34" y2="75" stroke="#64748b" strokeWidth="2" />
+        <line x1="60" y1="62" x2="86" y2="75" stroke="#64748b" strokeWidth="2" />
 
         {/* Left arm */}
-        <line x1="34" y1="75" x2="24" y2="105" stroke="#94a3b8" strokeWidth="2" />
-        <line x1="24" y1="105" x2="18" y2="130" stroke="#94a3b8" strokeWidth="2" />
+        <line x1="34" y1="75" x2="24" y2="105" stroke="#64748b" strokeWidth="2" />
+        <line x1="24" y1="105" x2="18" y2="130" stroke="#64748b" strokeWidth="2" />
 
         {/* Right arm */}
-        <line x1="86" y1="75" x2="96" y2="105" stroke="#94a3b8" strokeWidth="2" />
-        <line x1="96" y1="105" x2="102" y2="130" stroke="#94a3b8" strokeWidth="2" />
+        <line x1="86" y1="75" x2="96" y2="105" stroke="#64748b" strokeWidth="2" />
+        <line x1="96" y1="105" x2="102" y2="130" stroke="#64748b" strokeWidth="2" />
 
         {/* Torso */}
-        <line x1="60" y1="62" x2="60" y2="140" stroke="#94a3b8" strokeWidth="2" />
+        <line x1="60" y1="62" x2="60" y2="140" stroke="#64748b" strokeWidth="2" />
 
         {/* Pelvis */}
-        <line x1="42" y1="140" x2="78" y2="140" stroke="#94a3b8" strokeWidth="2" />
+        <line x1="42" y1="140" x2="78" y2="140" stroke="#64748b" strokeWidth="2" />
 
         {/* Left leg */}
-        <line x1="48" y1="140" x2="46" y2="185" stroke="#94a3b8" strokeWidth="2" />
-        <line x1="46" y1="185" x2="44" y2="230" stroke="#94a3b8" strokeWidth="2" />
-        <line x1="44" y1="230" x2="40" y2="256" stroke="#94a3b8" strokeWidth="2" />
+        <line x1="48" y1="140" x2="46" y2="185" stroke="#64748b" strokeWidth="2" />
+        <line x1="46" y1="185" x2="44" y2="230" stroke="#64748b" strokeWidth="2" />
+        <line x1="44" y1="230" x2="40" y2="256" stroke="#64748b" strokeWidth="2" />
 
         {/* Right leg */}
-        <line x1="72" y1="140" x2="74" y2="185" stroke="#94a3b8" strokeWidth="2" />
-        <line x1="74" y1="185" x2="76" y2="230" stroke="#94a3b8" strokeWidth="2" />
-        <line x1="76" y1="230" x2="80" y2="256" stroke="#94a3b8" strokeWidth="2" />
+        <line x1="72" y1="140" x2="74" y2="185" stroke="#64748b" strokeWidth="2" />
+        <line x1="74" y1="185" x2="76" y2="230" stroke="#64748b" strokeWidth="2" />
+        <line x1="76" y1="230" x2="80" y2="256" stroke="#64748b" strokeWidth="2" />
 
         {/* Joint dots */}
         {[
@@ -99,7 +99,7 @@ export default function BodyMap({ scores = {} }) {
           [46, 185], [74, 185],                  // knees
           [44, 230], [76, 230],                  // ankles
         ].map(([cx, cy], i) => (
-          <circle key={i} cx={cx} cy={cy} r="3.5" fill="#6366f1" opacity="0.85" />
+          <circle key={i} cx={cx} cy={cy} r="3.5" fill="#4f46e5" opacity="0.85" />
         ))}
 
         {/* Risk-colored knee dots */}
