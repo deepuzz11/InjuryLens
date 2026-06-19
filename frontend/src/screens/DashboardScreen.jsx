@@ -9,7 +9,6 @@ import {
   BarChart3, Award, Trophy,
 } from 'lucide-react'
 import { useStore } from '../store'
-import Navbar from '../components/Navbar'
 import GamificationPanel from '../components/GamificationPanel'
 
 const COLORS = {
@@ -101,8 +100,7 @@ export default function DashboardScreen() {
   if (history.length === 0) {
     return (
       <div className="min-h-screen mesh-bg pb-20">
-        <Navbar />
-        <div className="max-w-4xl mx-auto px-4 pt-24 flex flex-col items-center justify-center min-h-[60vh] text-center">
+        <div className="max-w-4xl mx-auto px-4 pt-8 flex flex-col items-center justify-center min-h-[60vh] text-center">
           <div className="w-16 h-16 rounded-2xl bg-accent-glow flex items-center justify-center mb-4">
             <BarChart3 size={28} className="text-accent-secondary" />
           </div>
@@ -121,9 +119,7 @@ export default function DashboardScreen() {
 
   return (
     <div className="min-h-screen mesh-bg pb-20">
-      <Navbar />
-
-      <div className="max-w-5xl mx-auto px-4 pt-24">
+      <div className="max-w-5xl mx-auto px-4 pt-8">
         <div className="mb-6">
           <h1 className="text-2xl font-bold text-text-primary">Progress Dashboard</h1>
           <p className="text-sm text-text-secondary mt-0.5">

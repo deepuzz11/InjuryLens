@@ -2,7 +2,6 @@ import React, { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { User, Plus, Edit2, Trash2, Check, X, Users, ChevronRight } from 'lucide-react'
 import { useStore } from '../store'
-import Navbar from '../components/Navbar'
 
 const FITNESS_LEVELS = ['Beginner', 'Intermediate', 'Advanced', 'Elite Athlete']
 const AGE_GROUPS     = ['Under 18', '18–24', '25–34', '35–44', '45–54', '55+']
@@ -166,8 +165,7 @@ export default function ProfilesScreen() {
 
   return (
     <div className="min-h-screen mesh-bg pb-20">
-      <Navbar />
-      <div className="max-w-3xl mx-auto px-4 pt-24">
+      <div className="max-w-3xl mx-auto px-4 pt-8">
         <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}>
           <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
             <div>

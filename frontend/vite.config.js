@@ -9,6 +9,7 @@ export default defineConfig({
       '/analyze':   'http://localhost:8000',
       '/health':    'http://localhost:8000',
       '/movements': 'http://localhost:8000',
+      '/auth':      'http://localhost:8000',
     },
     headers: {
       // Required for SharedArrayBuffer used by some WASM runtimes

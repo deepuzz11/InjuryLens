@@ -27,6 +27,13 @@ export default {
           subtle: 'rgba(15,23,42,0.08)',
           accent: 'rgba(79,70,229,0.22)',
         },
+        /* ── Dark futuristic (landing / auth) ── */
+        night: {
+          base:    '#02050f',
+          surface: '#080d1e',
+          card:    '#0d1427',
+          border:  'rgba(99,102,241,0.18)',
+        },
       },
       fontFamily: {
         sans: ['Inter', 'system-ui', 'sans-serif'],
@@ -57,6 +64,18 @@ export default {
         'scale-pulse':     'scalePulse 2.4s ease-in-out infinite',
         'swipe-up':        'swipeUp 0.4s ease-out forwards',
         'aurora-drift':    'auroraDrift 10s ease-in-out infinite alternate',
+        'typing':          'typing 3.5s steps(40,end) forwards',
+        'blink':           'blink 0.75s step-end infinite',
+        'neon-flicker':    'neonFlicker 3s ease-in-out infinite',
+        'slide-up':        'slideUp 0.5s cubic-bezier(0.16,1,0.3,1) forwards',
+        'slide-down-fade': 'slideDownFade 0.4s ease-out forwards',
+        'counter':         'counterPop 0.6s cubic-bezier(0.16,1,0.3,1) forwards',
+        'card-enter':      'cardEnter 0.5s cubic-bezier(0.16,1,0.3,1) forwards',
+        'pulse-ring':      'pulseRing 2s cubic-bezier(0.4,0,0.6,1) infinite',
+        'gradient-x':      'gradientX 5s ease infinite',
+        'orb-1':           'floatOrb 12s ease-in-out infinite alternate',
+        'orb-2':           'floatOrb 9s ease-in-out infinite alternate-reverse',
+        'orb-3':           'floatOrb 15s ease-in-out infinite alternate',
       },
       keyframes: {
         gradientRotate: {
@@ -158,6 +177,43 @@ export default {
           '0%':   { backgroundPosition: '0% 50%'   },
           '50%':  { backgroundPosition: '100% 25%' },
           '100%': { backgroundPosition: '50% 100%' },
+        },
+        typing: {
+          from: { width: '0' },
+          to:   { width: '100%' },
+        },
+        blink: {
+          '0%, 100%': { borderColor: 'transparent' },
+          '50%':      { borderColor: '#6366f1'     },
+        },
+        neonFlicker: {
+          '0%, 19%, 21%, 23%, 25%, 54%, 56%, 100%': { textShadow: '0 0 18px rgba(99,102,241,0.8), 0 0 40px rgba(99,102,241,0.4)' },
+          '20%, 24%, 55%':                           { textShadow: 'none' },
+        },
+        slideUp: {
+          from: { opacity: '0', transform: 'translateY(24px)' },
+          to:   { opacity: '1', transform: 'translateY(0)'    },
+        },
+        slideDownFade: {
+          from: { opacity: '0', transform: 'translateY(-12px)' },
+          to:   { opacity: '1', transform: 'translateY(0)'     },
+        },
+        counterPop: {
+          '0%':   { opacity: '0', transform: 'scale(0.6)' },
+          '70%':  { transform: 'scale(1.08)'              },
+          '100%': { opacity: '1', transform: 'scale(1)'   },
+        },
+        cardEnter: {
+          from: { opacity: '0', transform: 'translateY(32px) scale(0.97)' },
+          to:   { opacity: '1', transform: 'translateY(0) scale(1)'       },
+        },
+        pulseRing: {
+          '0%':   { transform: 'scale(1)',    opacity: '1'   },
+          '100%': { transform: 'scale(2.2)', opacity: '0'   },
+        },
+        gradientX: {
+          '0%, 100%': { backgroundPosition: '0% 50%'   },
+          '50%':      { backgroundPosition: '100% 50%' },
         },
       },
       backdropBlur: {

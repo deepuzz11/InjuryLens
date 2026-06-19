@@ -8,7 +8,6 @@ import {
   BookmarkCheck, AlertCircle,
 } from 'lucide-react'
 import { useStore } from '../store'
-import Navbar from '../components/Navbar'
 import AnimatedBar from '../components/AnimatedBar'
 import Accordion from '../components/Accordion'
 import RiskGauge from '../components/RiskGauge'
@@ -287,10 +286,8 @@ export default function ResultsScreen() {
 
   return (
     <div className="min-h-screen mesh-bg pb-20">
-      <Navbar />
-
       {/* Sticky sub-header */}
-      <div className="sticky top-16 z-40 border-b border-border-subtle bg-bg-base/80 backdrop-blur-xl pdf-exclude">
+      <div className="sticky top-0 z-40 border-b border-border-subtle bg-bg-base/80 backdrop-blur-xl pdf-exclude">
         <div className="max-w-6xl mx-auto px-4 h-12 flex items-center justify-between gap-4">
           {/* Left: movement info */}
           <div className="flex items-center gap-2.5 min-w-0">

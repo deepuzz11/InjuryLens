@@ -2,7 +2,6 @@ import React, { useEffect, useRef, useState, useCallback } from 'react'
 import { motion } from 'framer-motion'
 import { Video, Square, AlertTriangle, Activity, RotateCcw, Zap } from 'lucide-react'
 import { useStore } from '../store'
-import Navbar from '../components/Navbar'
 
 // MediaPipe pose connections for skeleton drawing
 const POSE_CONNECTIONS = [
@@ -225,16 +224,14 @@ export default function LiveAnalysisScreen() {
 
   return (
     <div className="min-h-screen mesh-bg pb-20">
-      <Navbar />
-
-      <div className="max-w-5xl mx-auto px-4 pt-24">
+      <div className="max-w-5xl mx-auto px-4 pt-8">
         <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}>
           <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
             <div>
               <h1 className="text-2xl font-bold text-text-primary flex items-center gap-2">
                 <Video size={22} className="text-accent-primary" /> Live Analysis
               </h1>
-              <p className="text-sm text-text-secondary mt-0.5">Real-time pose detection with in-browser MediaPipe WASM</p>
+              <p className="text-sm text-text-secondary mt-0.5">Real-time pose detection — no upload needed</p>
             </div>
             <div className="flex gap-2">
               <select
@@ -256,12 +253,12 @@ export default function LiveAnalysisScreen() {
           {status === 'initializing' && (
             <div className="flex items-center gap-2 px-4 py-2 rounded-xl glass border border-accent-primary/20 text-accent-primary text-sm mb-4">
               <div className="w-4 h-4 rounded-full border-2 border-accent-primary/30 border-t-accent-primary animate-spin" />
-              Loading MediaPipe WASM model…
+              Loading pose detection model…
             </div>
           )}
           {status === 'error' && (
             <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-danger/10 border border-danger/30 text-danger text-sm mb-4">
-              <AlertTriangle size={14} />Failed to load MediaPipe. Ensure you are connected to the internet.
+              <AlertTriangle size={14} />Failed to load pose model. Check your internet connection.
             </div>
           )}
 

@@ -14,6 +14,8 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 
 from config import settings
+from database import init_db
+from auth_router import router as auth_router
 from models import (
     AnalysisResponse,
     AnnotatedFrameSet,
@@ -73,6 +75,33 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.include_router(auth_router)
+
+@app.on_event("startup")
+def on_startup():
+    init_db()
+    _seed_demo_user()
+    logger.info("Database initialised.")
+
+def _seed_demo_user():
+    """Ensure a demo account exists so users can try the app without registering."""
+    from database import SessionLocal
+    from auth_models import User
+    from passlib.context import CryptContext
+    _pwd = CryptContext(schemes=["bcrypt"], deprecated="auto")
+    db = SessionLocal()
+    try:
+        if not db.query(User).filter(User.email == "demo@injurylens.com").first():
+            db.add(User(
+                name="Demo Athlete",
+                email="demo@injurylens.com",
+                hashed_password=_pwd.hash("demo1234"),
+            ))
+            db.commit()
+            logger.info("Demo user created: demo@injurylens.com / demo1234")
+    finally:
+        db.close()
 
 ALLOWED_EXTENSIONS = {".mp4", ".mov", ".avi"}
 ALLOWED_MIME_TYPES = {"video/mp4", "video/quicktime", "video/x-msvideo", "video/avi"}

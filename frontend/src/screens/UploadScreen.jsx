@@ -9,7 +9,6 @@ import {
 } from 'lucide-react'
 import { useStore } from '../store'
 import { analyzeVideo } from '../api'
-import Navbar from '../components/Navbar'
 import ErrorCard from '../components/ErrorCard'
 import WebcamRecorder from '../components/WebcamRecorder'
 import CameraGuide from '../components/CameraGuide'
@@ -221,8 +220,6 @@ export default function UploadScreen() {
 
   return (
     <div className="min-h-screen mesh-bg">
-      <Navbar />
-
       {showWebcam && (
         <WebcamRecorder
           onCapture={(f) => { acceptFile(f); setShowWebcam(false) }}
@@ -237,7 +234,7 @@ export default function UploadScreen() {
       </AnimatePresence>
 
       {/* ── Hero ──────────────────────────────────────────────────────────── */}
-      <section className="relative pt-32 pb-16 px-4 overflow-hidden">
+      <section className="relative pt-12 pb-16 px-4 overflow-hidden">
 
         {/* Ambient background orbs */}
         <div className="absolute inset-0 pointer-events-none">
@@ -270,7 +267,7 @@ export default function UploadScreen() {
                             glass border border-accent-primary/20 text-accent-primary text-xs font-medium
                             shadow-sm shadow-accent-primary/10">
               <Sparkles size={11} aria-hidden />
-              Gemini 2.0 Flash · MediaPipe Pose
+              AI-Powered Movement Analysis
               <span className="text-accent-primary/40">·</span>
               <span className="text-text-muted">12 Movement Types</span>
             </div>
@@ -590,8 +587,8 @@ export default function UploadScreen() {
           </motion.div>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
             <HowItWorksCard step={1} icon={Upload}    title="Upload or Record"           desc="Upload an MP4/MOV/AVI file or record directly with your webcam. Ensure your full body is visible with good lighting." delay={0} />
-            <HowItWorksCard step={2} icon={Brain}     title="AI Analyzes Your Movement"  desc="MediaPipe tracks 33 body landmarks per frame. Our engine measures 6 risk metrics, counts reps, and detects fatigue-driven form degradation." delay={0.1} />
-            <HowItWorksCard step={3} icon={BarChart3} title="Get Your Full Report"       desc="Gemini 2.0 Flash generates a personalised coaching plan with movement cues, 5 exercises, a warm-up routine, and a weekly training plan." delay={0.2} />
+            <HowItWorksCard step={2} icon={Brain}     title="AI Analyzes Your Movement"  desc="Our engine tracks 33 body landmarks per frame, measures 6 risk metrics, counts reps, and detects fatigue-driven form degradation." delay={0.1} />
+            <HowItWorksCard step={3} icon={BarChart3} title="Get Your Full Report"       desc="A personalised AI coaching plan is generated with movement cues, 5 corrective exercises, a warm-up routine, and a weekly training plan." delay={0.2} />
           </div>
         </div>
       </section>
@@ -640,7 +637,7 @@ export default function UploadScreen() {
               'linear-gradient(90deg, transparent, rgba(79,70,229,0.18) 40%, rgba(124,58,237,0.13) 60%, transparent)',
           }}
         />
-        InjuryLens · Built with MediaPipe, FastAPI &amp; Gemini AI · Not a substitute for professional medical advice
+        InjuryLens · AI Movement Analysis · Not a substitute for professional medical advice
       </footer>
     </div>
   )

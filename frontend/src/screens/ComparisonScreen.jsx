@@ -2,7 +2,6 @@ import React from 'react'
 import { motion } from 'framer-motion'
 import { ArrowLeft, CheckCircle, AlertTriangle, XCircle, TrendingDown, TrendingUp, Minus } from 'lucide-react'
 import { useStore } from '../store'
-import Navbar from '../components/Navbar'
 
 function RiskBadge({ level }) {
   const map = {
@@ -55,8 +54,7 @@ export default function ComparisonScreen() {
   if (!compareData || !compareData.second) {
     return (
       <div className="min-h-screen mesh-bg pb-20">
-        <Navbar />
-        <div className="max-w-4xl mx-auto px-4 pt-24 text-center">
+        <div className="max-w-4xl mx-auto px-4 pt-8 text-center">
           <p className="text-text-secondary">No comparison data selected. Go to History and select two analyses.</p>
           <button
             onClick={() => setScreen('history')}
@@ -74,9 +72,7 @@ export default function ComparisonScreen() {
 
   return (
     <div className="min-h-screen mesh-bg pb-20">
-      <Navbar />
-
-      <div className="max-w-4xl mx-auto px-4 pt-24">
+      <div className="max-w-4xl mx-auto px-4 pt-8">
         {/* Header */}
         <div className="flex items-center gap-3 mb-6">
           <button

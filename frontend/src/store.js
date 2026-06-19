@@ -43,9 +43,59 @@ const DEFAULT_PROFILE = {
   createdAt:    new Date().toISOString(),
 }
 
+const AUTH_API = '/auth'
+
 export const useStore = create(
   persist(
     (set, get) => ({
+      // ── Auth ─────────────────────────────────────────────────────────────────
+      isAuthenticated: false,
+      authUser: null,
+      authToken: null,
+
+      login: (user, token) => set({ isAuthenticated: true, authUser: user, authToken: token }),
+
+      logout: () => set({
+        isAuthenticated: false, authUser: null, authToken: null,
+        screen: 'upload', results: null, error: null,
+      }),
+
+      registerUser: async (name, email, password) => {
+        const res = await fetch(`${AUTH_API}/register`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, email, password }),
+        })
+        const data = await res.json()
+        if (!res.ok) throw new Error(data.detail || 'Registration failed.')
+        set({ isAuthenticated: true, authUser: data.user, authToken: data.access_token })
+        return data
+      },
+
+      loginUser: async (email, password) => {
+        const res = await fetch(`${AUTH_API}/login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password }),
+        })
+        const data = await res.json()
+        if (!res.ok) throw new Error(data.detail || 'Login failed.')
+        set({ isAuthenticated: true, authUser: data.user, authToken: data.access_token })
+        return data
+      },
+
+      forgotPassword: async (email) => {
+        const res = await fetch(`${AUTH_API}/forgot-password`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email }),
+        })
+        const data = await res.json()
+        if (!res.ok) throw new Error(data.detail || 'Request failed.')
+        return data
+      },
+
+      // ── App screens ──────────────────────────────────────────────────────────
       screen: 'upload',
       results: null,
       error: null,
@@ -201,8 +251,11 @@ export const useStore = create(
         set((state) => ({ settings: { ...state.settings, ...updates } })),
     }),
     {
-      name: 'injurylens-v3',
+      name: 'injurylens-v4',
       partialize: (state) => ({
+        isAuthenticated:     state.isAuthenticated,
+        authUser:            state.authUser,
+        authToken:           state.authToken,
         history:             state.history,
         settings:            state.settings,
         profiles:            state.profiles,

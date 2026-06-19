@@ -169,7 +169,7 @@ export default function TimelineChart({ data = [] }) {
         {mode === 'angles'   && 'Dashed: valgus threshold (165°) and trunk lean threshold (25°)'}
         {mode === 'velocity' && 'Joint velocity in degrees per frame. Spikes indicate rapid deceleration / ACL risk events.'}
         {mode === 'accel'    && 'Joint acceleration (Δvelocity). High values correlate with impact loading.'}
-        {mode === '3d'       && '3D rotation from depth (z) coordinates — trunk and hip rotation using MediaPipe depth data.'}
+        {mode === '3d'       && '3D rotation from depth (z) coordinates — trunk and hip rotation derived from pose depth data.'}
       </p>
     </div>
   )

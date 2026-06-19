@@ -3,14 +3,14 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { Activity } from 'lucide-react'
 
 const STEPS = [
-  { label: 'Initializing pose detection engine',      detail: 'MediaPipe 33-landmark model ready'         },
+  { label: 'Initializing pose detection engine',      detail: '33-landmark skeleton model ready'           },
   { label: 'Extracting body landmarks per frame',     detail: 'Tracking joints frame-by-frame'            },
   { label: 'Running knee valgus analysis',            detail: 'Left & right stability metrics'            },
   { label: 'Checking trunk alignment',                detail: 'Forward lean & posture angle'              },
   { label: 'Detecting left-right asymmetry',          detail: 'Comparing joint angles bilaterally'        },
   { label: 'Scoring biomechanical risk factors',      detail: '6-metric risk assessment complete'         },
   { label: 'Analyzing fatigue patterns',              detail: 'First vs. second-half form quality'        },
-  { label: 'Consulting AI physiotherapy model',       detail: 'Gemini 2.0 Flash generating insights'     },
+  { label: 'Consulting AI physiotherapy model',       detail: 'Generating personalised insights'          },
   { label: 'Building your personalized coaching plan', detail: 'Training program & cue generation'       },
 ]
 

@@ -5,7 +5,6 @@ import {
   XCircle, BarChart3, GitCompareArrows, Dumbbell, ChevronRight,
 } from 'lucide-react'
 import { useStore } from '../store'
-import Navbar from '../components/Navbar'
 
 function RiskBadge({ level }) {
   const map = {
@@ -163,9 +162,7 @@ export default function HistoryScreen() {
 
   return (
     <div className="min-h-screen mesh-bg pb-20">
-      <Navbar />
-
-      <div className="max-w-4xl mx-auto px-4 pt-24">
+      <div className="max-w-4xl mx-auto px-4 pt-8">
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div>
