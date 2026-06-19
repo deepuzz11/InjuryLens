@@ -7,7 +7,16 @@ export default defineConfig({
     port: 5173,
     proxy: {
       '/analyze': 'http://localhost:8000',
-      '/health': 'http://localhost:8000',
+      '/health':  'http://localhost:8000',
+    },
+    headers: {
+      // Required for SharedArrayBuffer used by some WASM runtimes
+      'Cross-Origin-Opener-Policy': 'same-origin',
+      'Cross-Origin-Embedder-Policy': 'require-corp',
     },
   },
+  optimizeDeps: {
+    exclude: ['@mediapipe/tasks-vision'],
+  },
+  assetsInclude: ['**/*.wasm', '**/*.task'],
 })

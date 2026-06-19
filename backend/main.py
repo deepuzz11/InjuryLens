@@ -1,26 +1,38 @@
 import os
-import uuid
 import time
-import base64
-import json
+import uuid
 import logging
 import tempfile
 import traceback
 from pathlib import Path
-from typing import Optional
 
-import cv2
-import numpy as np
 import mediapipe as mp
 from fastapi import FastAPI, File, Form, UploadFile, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from dotenv import load_dotenv
-import google.generativeai as genai
-from PIL import Image
-import io
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.requests import Request
 
-load_dotenv()
+from config import settings
+from models import (
+    AnalysisResponse,
+    AnnotatedFrameSet,
+    RiskScores,
+    SupplementaryStats,
+    AICoaching,
+    IndividualFeedback,
+    ExerciseItem,
+    WarmupItem,
+    WeeklyPlanDay,
+    FrameDataPoint,
+    ErrorResponse,
+    MovementInfo,
+)
+from pose_extractor import PoseExtractor
+from biomechanics import BiomechanicsEngine
+from scoring import RiskScorer
+from ai_coach import AICoach
+from annotator import FrameAnnotator
 
 logging.basicConfig(
     level=logging.INFO,
@@ -31,15 +43,29 @@ logger = logging.getLogger("injurylens")
 
 START_TIME = time.time()
 
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
-if GEMINI_API_KEY:
-    genai.configure(api_key=GEMINI_API_KEY)
-    logger.info("Gemini API configured successfully")
-else:
-    logger.warning("GEMINI_API_KEY not set — AI coaching will use fallback responses")
+pose_extractor   = PoseExtractor()
+biomechanics_engine = BiomechanicsEngine()
+risk_scorer      = RiskScorer()
+ai_coach         = AICoach()
+frame_annotator  = FrameAnnotator()
 
-app = FastAPI(title="InjuryLens API", version="1.0.0")
+app = FastAPI(
+    title=settings.APP_NAME,
+    version=settings.VERSION,
+    description="AI-powered sports movement analysis and injury risk assessment.",
+)
 
+
+class RequestLoggingMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        start    = time.time()
+        response = await call_next(request)
+        elapsed  = round(time.time() - start, 3)
+        logger.info(f"{request.method} {request.url.path} → {response.status_code} ({elapsed}s)")
+        return response
+
+
+app.add_middleware(RequestLoggingMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -48,599 +74,329 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-mp_pose = mp.solutions.pose
-mp_drawing = mp.solutions.drawing_utils
-
-ALLOWED_MIME_TYPES = {"video/mp4", "video/quicktime", "video/x-msvideo", "video/avi"}
 ALLOWED_EXTENSIONS = {".mp4", ".mov", ".avi"}
-MAX_FILE_SIZE_BYTES = 100 * 1024 * 1024  # 100MB
+ALLOWED_MIME_TYPES = {"video/mp4", "video/quicktime", "video/x-msvideo", "video/avi"}
 
-# Landmark indices (MediaPipe Pose)
-NOSE = 0
-LEFT_SHOULDER = 11
-RIGHT_SHOULDER = 12
-LEFT_HIP = 23
-RIGHT_HIP = 24
-LEFT_KNEE = 25
-RIGHT_KNEE = 26
-LEFT_ANKLE = 27
-RIGHT_ANKLE = 28
-
-
-# ─────────────────────────────────────────────
-# BIOMECHANICS UTILITIES
-# ─────────────────────────────────────────────
-
-def calculate_angle(a: np.ndarray, b: np.ndarray, c: np.ndarray) -> float:
-    """Return the angle at vertex b formed by segments b→a and b→c, in degrees."""
-    ba = a - b
-    bc = c - b
-    norm_ba = np.linalg.norm(ba)
-    norm_bc = np.linalg.norm(bc)
-    if norm_ba < 1e-6 or norm_bc < 1e-6:
-        return 180.0
-    cos_angle = np.dot(ba, bc) / (norm_ba * norm_bc)
-    cos_angle = np.clip(cos_angle, -1.0, 1.0)
-    return float(np.degrees(np.arccos(cos_angle)))
+SUPPORTED_MOVEMENTS = [
+    MovementInfo(id="Squat",          label="Squat",           category="Lower Body",  description="Bilateral lower body strength assessment.", key_metrics=["knee valgus", "trunk lean", "depth", "asymmetry"], difficulty="Beginner"),
+    MovementInfo(id="Deadlift",       label="Deadlift",         category="Full Body",   description="Hip-hinge pulling movement from the floor.", key_metrics=["trunk lean", "knee valgus", "hip hinge", "bar path"], difficulty="Intermediate"),
+    MovementInfo(id="Lunge",          label="Lunge",            category="Lower Body",  description="Single-leg stepping pattern for unilateral assessment.", key_metrics=["knee valgus", "trunk control", "hip stability"], difficulty="Beginner"),
+    MovementInfo(id="Running",        label="Running",          category="Cardio",      description="Gait analysis for running mechanics and injury risk.", key_metrics=["knee valgus", "trunk lean", "bilateral symmetry"], difficulty="Beginner"),
+    MovementInfo(id="Jump Landing",   label="Jump Landing",     category="Power",       description="Dynamic deceleration assessment for ACL risk.", key_metrics=["knee valgus on landing", "trunk control", "bilateral load"], difficulty="Intermediate"),
+    MovementInfo(id="Push-up",        label="Push-up",          category="Upper Body",  description="Upper body push pattern with core stability demand.", key_metrics=["shoulder asymmetry", "trunk lean", "elbow alignment"], difficulty="Beginner"),
+    MovementInfo(id="Plank",          label="Plank",            category="Core",        description="Isometric core stability assessment.", key_metrics=["trunk alignment", "hip sag", "shoulder stability"], difficulty="Beginner"),
+    MovementInfo(id="Hip Hinge",      label="Hip Hinge",        category="Lower Body",  description="Posterior chain loading pattern — foundation for deadlift.", key_metrics=["hip flexion", "trunk lean", "knee tracking"], difficulty="Beginner"),
+    MovementInfo(id="Overhead Press", label="Overhead Press",   category="Upper Body",  description="Vertical pressing with overhead stability demand.", key_metrics=["trunk lean", "shoulder symmetry", "elbow alignment"], difficulty="Intermediate"),
+    MovementInfo(id="Lateral Lunge",  label="Lateral Lunge",    category="Lower Body",  description="Frontal plane single-leg assessment.", key_metrics=["knee valgus", "hip drop", "trunk lean"], difficulty="Intermediate"),
+    MovementInfo(id="Split Squat",    label="Split Squat",      category="Lower Body",  description="Unilateral squat pattern with staggered stance.", key_metrics=["knee valgus", "trunk control", "hip stability"], difficulty="Intermediate"),
+    MovementInfo(id="Bench Press",    label="Bench Press",      category="Upper Body",  description="Horizontal push pattern with shoulder and chest assessment.", key_metrics=["shoulder asymmetry", "elbow flare", "wrist alignment"], difficulty="Intermediate"),
+]
 
 
-def get_landmark_xy(landmarks, idx: int, w: int, h: int) -> np.ndarray:
-    lm = landmarks.landmark[idx]
-    return np.array([lm.x * w, lm.y * h])
+def _risk_level_from_score(overall: int) -> str:
+    if overall < 30:
+        return "Low"
+    if overall < 60:
+        return "Moderate"
+    return "High"
 
 
-def get_landmark_xyz(landmarks, idx: int) -> np.ndarray:
-    lm = landmarks.landmark[idx]
-    return np.array([lm.x, lm.y, lm.z])
+def _build_frame_timeline(frame_flags: list[dict], sample_every: int = 3) -> list[FrameDataPoint]:
+    """Downsample frame_flags to a manageable timeline for charting (Features 4, 11)."""
+    result = []
+    for i, f in enumerate(frame_flags):
+        if i % sample_every != 0:
+            continue
+        result.append(FrameDataPoint(
+            frame_index=i,
+            left_knee_angle=round(f["left_knee_angle"], 1),
+            right_knee_angle=round(f["right_knee_angle"], 1),
+            trunk_lean_angle=round(f["trunk_lean_angle"], 1),
+            shoulder_asymmetry=round(f.get("shoulder_height_diff", 0) * 100, 1),
+            risk_score=f.get("frame_risk", 0),
+            left_knee_velocity=f.get("left_knee_velocity", 0.0),
+            right_knee_velocity=f.get("right_knee_velocity", 0.0),
+            trunk_lean_velocity=f.get("trunk_lean_velocity", 0.0),
+            left_knee_acceleration=f.get("left_knee_acceleration", 0.0),
+            right_knee_acceleration=f.get("right_knee_acceleration", 0.0),
+            trunk_rotation_3d=f.get("trunk_rotation_3d", 0.0),
+            hip_rotation_3d=f.get("hip_rotation_3d", 0.0),
+        ))
+    return result
 
 
-def mean_visibility(landmarks, indices: list[int]) -> float:
-    return float(np.mean([landmarks.landmark[i].visibility for i in indices]))
-
-
-def compute_trunk_lean_angle(landmarks) -> float:
-    """Angle between the torso line (mid-hip → mid-shoulder) and vertical axis."""
-    mid_hip = (get_landmark_xyz(landmarks, LEFT_HIP) + get_landmark_xyz(landmarks, RIGHT_HIP)) / 2
-    mid_shoulder = (get_landmark_xyz(landmarks, LEFT_SHOULDER) + get_landmark_xyz(landmarks, RIGHT_SHOULDER)) / 2
-    torso = mid_shoulder - mid_hip
-    vertical = np.array([0, -1, 0])
-    norm_t = np.linalg.norm(torso)
-    if norm_t < 1e-6:
-        return 0.0
-    cos_a = np.dot(torso, vertical) / norm_t
-    cos_a = np.clip(cos_a, -1.0, 1.0)
-    return float(np.degrees(np.arccos(cos_a)))
-
-
-# ─────────────────────────────────────────────
-# VIDEO PROCESSING
-# ─────────────────────────────────────────────
-
-def extract_pose_data(video_path: str) -> dict:
-    """
-    Run MediaPipe Pose on every frame.
-    Returns per-frame angle data and the raw frames list for annotation.
-    """
-    cap = cv2.VideoCapture(video_path)
-    if not cap.isOpened():
-        raise ValueError("Unable to open video file. It may be corrupted or in an unsupported format.")
-
-    frame_data = []
-    raw_frames = []
-    frame_idx = 0
-
-    with mp_pose.Pose(
-        static_image_mode=False,
-        model_complexity=1,
-        min_detection_confidence=0.6,
-        min_tracking_confidence=0.6,
-    ) as pose:
-        while True:
-            ret, frame = cap.read()
-            if not ret:
-                break
-
-            h, w = frame.shape[:2]
-            rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            results = pose.process(rgb)
-
-            if results.pose_landmarks:
-                lms = results.pose_landmarks
-                key_indices = [LEFT_HIP, RIGHT_HIP, LEFT_KNEE, RIGHT_KNEE,
-                               LEFT_ANKLE, RIGHT_ANKLE, LEFT_SHOULDER, RIGHT_SHOULDER]
-                vis = mean_visibility(lms, key_indices)
-
-                if vis > 0.5:
-                    lhip = get_landmark_xy(lms, LEFT_HIP, w, h)
-                    lknee = get_landmark_xy(lms, LEFT_KNEE, w, h)
-                    lankle = get_landmark_xy(lms, LEFT_ANKLE, w, h)
-                    rhip = get_landmark_xy(lms, RIGHT_HIP, w, h)
-                    rknee = get_landmark_xy(lms, RIGHT_KNEE, w, h)
-                    rankle = get_landmark_xy(lms, RIGHT_ANKLE, w, h)
-
-                    left_knee_angle = calculate_angle(lhip, lknee, lankle)
-                    right_knee_angle = calculate_angle(rhip, rknee, rankle)
-                    trunk_lean = compute_trunk_lean_angle(lms)
-                    asymmetry = abs(left_knee_angle - right_knee_angle)
-
-                    frame_data.append({
-                        "frame_idx": frame_idx,
-                        "left_knee_angle": left_knee_angle,
-                        "right_knee_angle": right_knee_angle,
-                        "trunk_lean": trunk_lean,
-                        "asymmetry": asymmetry,
-                        "landmarks": lms,
-                        "frame": frame.copy(),
-                        "visibility": vis,
-                    })
-                    raw_frames.append(frame.copy())
-
-            frame_idx += 1
-
-    cap.release()
-
-    if len(frame_data) < 10:
-        raise ValueError(
-            f"Only {len(frame_data)} valid pose frames detected (minimum 10 required). "
-            "Please re-record with better lighting, ensure your full body is visible, "
-            "and keep the camera steady."
+def _build_response(
+    analysis_id: str,
+    movement_type: str,
+    scores: dict,
+    avg_stats: dict,
+    n_frames: int,
+    coaching: dict,
+    annotated_b64: str,
+    annotated_frames_dict: dict,
+    frame_timeline: list,
+    metadata: dict,
+) -> AnalysisResponse:
+    individual = coaching.get("individual_feedback", {})
+    exercises  = [
+        ExerciseItem(
+            name=ex.get("name", "Exercise"),
+            sets_reps=ex.get("sets_reps", "3 × 10"),
+            why=ex.get("why", ""),
         )
-
-    return frame_data
-
-
-def compute_risk_scores(frame_data: list[dict]) -> dict:
-    """Convert per-frame flags to 0–100 risk scores and supplementary stats."""
-    n = len(frame_data)
-
-    left_valgus_flags = [1 for f in frame_data if f["left_knee_angle"] < 165]
-    right_valgus_flags = [1 for f in frame_data if f["right_knee_angle"] < 165]
-    trunk_flags = [1 for f in frame_data if f["trunk_lean"] > 25]
-    asym_flags = [1 for f in frame_data if f["asymmetry"] > 10]
-
-    knee_valgus_left = int(round(len(left_valgus_flags) / n * 100))
-    knee_valgus_right = int(round(len(right_valgus_flags) / n * 100))
-    trunk_lean = int(round(len(trunk_flags) / n * 100))
-    asymmetry = int(round(len(asym_flags) / n * 100))
-
-    overall = int(round(
-        knee_valgus_left * 0.30 +
-        knee_valgus_right * 0.30 +
-        trunk_lean * 0.25 +
-        asymmetry * 0.15
-    ))
-
-    avg_left = float(np.mean([f["left_knee_angle"] for f in frame_data]))
-    avg_right = float(np.mean([f["right_knee_angle"] for f in frame_data]))
-    avg_trunk = float(np.mean([f["trunk_lean"] for f in frame_data]))
-
-    # Worst frame = highest combined risk per frame
-    def frame_risk(f):
-        r = 0
-        if f["left_knee_angle"] < 165:
-            r += 30
-        if f["right_knee_angle"] < 165:
-            r += 30
-        if f["trunk_lean"] > 25:
-            r += 25
-        if f["asymmetry"] > 10:
-            r += 15
-        return r
-
-    worst_idx = int(np.argmax([frame_risk(f) for f in frame_data]))
-
-    return {
-        "scores": {
-            "knee_valgus_left": knee_valgus_left,
-            "knee_valgus_right": knee_valgus_right,
-            "trunk_lean": trunk_lean,
-            "asymmetry": asymmetry,
-            "overall": overall,
-        },
-        "supplementary": {
-            "avg_left_knee_angle": round(avg_left, 1),
-            "avg_right_knee_angle": round(avg_right, 1),
-            "avg_trunk_lean_angle": round(avg_trunk, 1),
-            "total_frames_analyzed": n,
-            "worst_frame_index": worst_idx,
-        },
-    }
-
-
-# ─────────────────────────────────────────────
-# FRAME ANNOTATION
-# ─────────────────────────────────────────────
-
-# Indigo and white matching the design system
-LANDMARK_COLOR = (241, 102, 99)   # BGR of #6366f1 → (241,102,99) — actually let's use proper BGR
-LANDMARK_COLOR_BGR = (241, 102, 99)   # BGR: R=99,G=102,B=241 → (241,102,99)
-CONNECTION_COLOR_BGR = (255, 255, 255)
-LANDMARK_DOT_BGR = (241, 102, 99)   # indigo BGR
-
-
-def annotate_frame(frame_data: list[dict], worst_idx: int, scores: dict) -> str:
-    """Draw MediaPipe skeleton on the worst frame and return base64 PNG."""
-    entry = frame_data[worst_idx]
-    frame = entry["frame"].copy()
-    landmarks = entry["landmarks"]
-
-    h, w = frame.shape[:2]
-
-    # Draw connections (white)
-    landmark_drawing_spec = mp_drawing.DrawingSpec(
-        color=(241, 102, 99), thickness=2, circle_radius=4  # BGR for indigo
-    )
-    connection_drawing_spec = mp_drawing.DrawingSpec(
-        color=(255, 255, 255), thickness=2, circle_radius=2
-    )
-    mp_drawing.draw_landmarks(
-        frame,
-        landmarks,
-        mp_pose.POSE_CONNECTIONS,
-        landmark_drawing_spec=landmark_drawing_spec,
-        connection_drawing_spec=connection_drawing_spec,
-    )
-
-    # Resize to max 800px width
-    if w > 800:
-        scale = 800 / w
-        new_w = 800
-        new_h = int(h * scale)
-        frame = cv2.resize(frame, (new_w, new_h))
-        h, w = new_h, new_w
-
-    # Top-left score overlay
-    score_items = [
-        ("L.Knee", scores["knee_valgus_left"]),
-        ("R.Knee", scores["knee_valgus_right"]),
-        ("Trunk", scores["trunk_lean"]),
-        ("Symmetry", scores["asymmetry"]),
+        for ex in coaching.get("exercise_prescription", [])
     ]
-    overlay = frame.copy()
-    cv2.rectangle(overlay, (8, 8), (180, 8 + len(score_items) * 28 + 10), (0, 0, 0), -1)
-    cv2.addWeighted(overlay, 0.6, frame, 0.4, 0, frame)
+    warmup = [
+        WarmupItem(
+            name=w.get("name", ""),
+            duration=w.get("duration", ""),
+            focus=w.get("focus", ""),
+        )
+        for w in coaching.get("warmup_routine", [])
+    ]
+    weekly = [
+        WeeklyPlanDay(
+            day=d.get("day", ""),
+            focus=d.get("focus", ""),
+            exercises=d.get("exercises", []),
+        )
+        for d in coaching.get("weekly_plan", [])
+    ]
 
-    for i, (label, score) in enumerate(score_items):
-        y = 30 + i * 28
-        if score <= 30:
-            color = (78, 197, 34)   # BGR green
-        elif score <= 60:
-            color = (11, 158, 245)  # BGR amber
-        else:
-            color = (68, 68, 239)   # BGR red
-        cv2.putText(frame, f"{label}: {score}%", (14, y),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.55, color, 1, cv2.LINE_AA)
+    annotated_frames_model = None
+    if annotated_frames_dict:
+        annotated_frames_model = AnnotatedFrameSet(
+            worst=annotated_frames_dict["worst"],
+            best=annotated_frames_dict["best"],
+            middle=annotated_frames_dict["middle"],
+        )
 
-    # Top-right overall risk badge
-    overall = scores["overall"]
-    if overall <= 30:
-        risk_label = "LOW RISK"
-        badge_color = (78, 197, 34)
-    elif overall <= 60:
-        risk_label = "MODERATE"
-        badge_color = (11, 158, 245)
-    else:
-        risk_label = "HIGH RISK"
-        badge_color = (68, 68, 239)
-
-    (tw, th), _ = cv2.getTextSize(risk_label, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2)
-    bx1 = w - tw - 22
-    bx2 = w - 8
-    by1 = 8
-    by2 = 8 + th + 16
-    cv2.rectangle(frame, (bx1, by1), (bx2, by2), badge_color, -1)
-    cv2.putText(frame, risk_label, (bx1 + 8, by2 - 8),
-                cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2, cv2.LINE_AA)
-
-    # Bottom watermark bar
-    bar_h = 32
-    overlay2 = frame.copy()
-    cv2.rectangle(overlay2, (0, h - bar_h), (w, h), (0, 0, 0), -1)
-    cv2.addWeighted(overlay2, 0.7, frame, 0.3, 0, frame)
-    cv2.putText(frame, "InjuryLens Analysis — PhysTech 2026",
-                (10, h - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5,
-                (180, 180, 180), 1, cv2.LINE_AA)
-
-    # Encode to base64 PNG
-    success, buf = cv2.imencode(".png", frame, [cv2.IMWRITE_PNG_COMPRESSION, 1])
-    if not success:
-        raise RuntimeError("Failed to encode annotated frame as PNG")
-    return base64.b64encode(buf.tobytes()).decode("utf-8")
-
-
-# ─────────────────────────────────────────────
-# AI COACHING
-# ─────────────────────────────────────────────
-
-STATIC_FALLBACK = {
-    "overall_risk_level": "Moderate",
-    "overall_summary": (
-        "Your movement analysis shows some areas for improvement, particularly in knee alignment "
-        "and trunk stability. With targeted exercises and cue adjustments, you can significantly "
-        "reduce your injury risk."
-    ),
-    "priority_issue": (
-        "Focus on knee alignment first — knee cave (valgus collapse) during loading phases "
-        "dramatically increases ACL and meniscus stress. Strengthen your glutes and practice "
-        "consciously driving knees out over toes."
-    ),
-    "coaching_cues": [
-        "Drive your knees outward in line with your second toe throughout the movement.",
-        "Brace your core before initiating the movement and maintain tension throughout.",
-        "Keep your chest tall — imagine a string pulling the crown of your head to the ceiling.",
-    ],
-    "exercise_prescription": [
-        {
-            "name": "Banded Squat with Knee Tracking",
-            "sets_reps": "3 × 15 reps",
-            "why": "Resistance band feedback trains the nervous system to maintain knee alignment.",
-        },
-        {
-            "name": "Single-Leg Glute Bridge",
-            "sets_reps": "3 × 12 each side",
-            "why": "Isolates and strengthens the glute medius, the primary stabilizer against valgus.",
-        },
-        {
-            "name": "Romanian Deadlift (light)",
-            "sets_reps": "3 × 10 reps",
-            "why": "Builds posterior chain strength and teaches neutral spinal alignment under load.",
-        },
-    ],
-    "positive_observation": (
-        "Your movement shows good overall body awareness and consistent rhythm. The bilateral "
-        "loading pattern is present, which is a solid foundation to build upon."
-    ),
-    "follow_up_timeline": (
-        "Re-assess your movement in 3–4 weeks after practicing the prescribed exercises. "
-        "Most athletes see measurable improvement in knee tracking within 2–3 weeks of consistent training."
-    ),
-    "individual_feedback": {
-        "knee_valgus_left": (
-            "Left knee shows inward collapse during the loading phase. This increases medial "
-            "compartment stress. Focus on activating your left glute medius before and during the movement."
+    return AnalysisResponse(
+        analysis_id=analysis_id,
+        movement_type=movement_type,
+        scores=RiskScores(
+            knee_valgus_left=scores["knee_valgus_left"],
+            knee_valgus_right=scores["knee_valgus_right"],
+            trunk_lean=scores["trunk_lean"],
+            asymmetry=scores["asymmetry"],
+            shoulder_asymmetry=scores.get("shoulder_asymmetry", 0),
+            hip_drop=scores.get("hip_drop", 0),
+            overall=scores["overall"],
         ),
-        "knee_valgus_right": (
-            "Right knee alignment is a key focus area. Practice single-leg balance drills to build "
-            "proprioceptive awareness and strengthen the lateral hip stabilizers on this side."
+        supplementary=SupplementaryStats(
+            avg_left_knee_angle=avg_stats["avg_left_knee_angle"],
+            avg_right_knee_angle=avg_stats["avg_right_knee_angle"],
+            avg_trunk_lean_angle=avg_stats["avg_trunk_lean_angle"],
+            avg_shoulder_asymmetry=avg_stats.get("avg_shoulder_asymmetry", 0.0),
+            total_frames_analyzed=n_frames,
+            worst_frame_index=avg_stats["worst_frame_index"],
+            rep_count=avg_stats.get("rep_count", 0),
+            fatigue_score=avg_stats.get("fatigue_score", 0),
+            video_duration_seconds=metadata.get("duration_seconds", 0.0),
+            fps=metadata.get("fps", 0.0),
+            avg_trunk_rotation_3d=avg_stats.get("avg_trunk_rotation_3d", 0.0),
+            avg_hip_rotation_3d=avg_stats.get("avg_hip_rotation_3d", 0.0),
+            avg_knee_depth_asym_3d=avg_stats.get("avg_knee_depth_asym_3d", 0.0),
+            peak_left_knee_velocity=avg_stats.get("peak_left_knee_velocity", 0.0),
+            peak_right_knee_velocity=avg_stats.get("peak_right_knee_velocity", 0.0),
+            mqs_score=avg_stats.get("mqs_score", 0.0),
+            mqs_grade=avg_stats.get("mqs_grade", "C"),
+            mqs_percentile=avg_stats.get("mqs_percentile", 50),
+            injury_probability_4w=avg_stats.get("injury_probability_4w", 0.0),
         ),
-        "trunk_lean": (
-            "Excessive forward trunk lean detected. This shifts load onto the lumbar spine and anterior "
-            "knee. Strengthen your thoracic extensors and practice the movement with arms raised overhead."
-        ),
-        "asymmetry": (
-            "Left-right asymmetry in knee angles suggests a dominant side compensating for the weaker side. "
-            "Incorporate unilateral exercises to address the imbalance before it leads to overuse injury."
-        ),
-    },
-}
-
-
-def build_coaching_prompt(movement_type: str, fitness_level: str, age_group: str,
-                          goal: str, scores: dict, supplementary: dict) -> str:
-    return f"""You are an expert sports physiotherapist providing a detailed injury risk coaching report.
-
-ATHLETE PROFILE:
-- Movement: {movement_type}
-- Fitness Level: {fitness_level}
-- Age Group: {age_group}
-- Goal: {goal}
-
-BIOMECHANICAL ANALYSIS RESULTS:
-- Left Knee Valgus Risk Score: {scores['knee_valgus_left']}/100 (% of frames with valgus)
-- Right Knee Valgus Risk Score: {scores['knee_valgus_right']}/100
-- Trunk Lean Risk Score: {scores['trunk_lean']}/100
-- Movement Asymmetry Risk Score: {scores['asymmetry']}/100
-- Overall Weighted Risk Score: {scores['overall']}/100
-
-SUPPLEMENTARY DATA:
-- Average Left Knee Angle: {supplementary['avg_left_knee_angle']}°
-- Average Right Knee Angle: {supplementary['avg_right_knee_angle']}°
-- Average Trunk Lean: {supplementary['avg_trunk_lean_angle']}°
-- Total Frames Analyzed: {supplementary['total_frames_analyzed']}
-
-Based on this data, provide a comprehensive physiotherapy coaching report. Return ONLY valid JSON with NO markdown fences, NO extra text. Use exactly this structure:
-
-{{
-  "overall_risk_level": "Low" | "Moderate" | "High",
-  "overall_summary": "2-3 sentence plain-English summary of the athlete's movement quality and main concerns",
-  "priority_issue": "The single most important thing to address, explained in 2 sentences with clinical reasoning",
-  "coaching_cues": ["cue1", "cue2", "cue3"],
-  "exercise_prescription": [
-    {{"name": "Exercise Name", "sets_reps": "3 × 10 reps", "why": "Brief clinical reason"}},
-    {{"name": "Exercise Name", "sets_reps": "3 × 12 reps", "why": "Brief clinical reason"}},
-    {{"name": "Exercise Name", "sets_reps": "2 × 15 reps", "why": "Brief clinical reason"}}
-  ],
-  "positive_observation": "What the athlete is doing well — specific and encouraging",
-  "follow_up_timeline": "Specific timeline for re-assessment and expected progress",
-  "individual_feedback": {{
-    "knee_valgus_left": "Specific feedback for left knee valgus finding",
-    "knee_valgus_right": "Specific feedback for right knee finding",
-    "trunk_lean": "Specific feedback for trunk lean finding",
-    "asymmetry": "Specific feedback for asymmetry finding"
-  }}
-}}"""
-
-
-def get_ai_coaching(movement_type: str, fitness_level: str, age_group: str,
-                    goal: str, scores: dict, supplementary: dict) -> dict:
-    """Call Gemini 2.0 Flash for coaching. Falls back to static if unavailable."""
-    if not GEMINI_API_KEY:
-        logger.info("No Gemini key — using static fallback coaching")
-        return _personalize_fallback(scores, movement_type)
-
-    try:
-        model = genai.GenerativeModel(
-            model_name="gemini-2.0-flash",
-            generation_config=genai.types.GenerationConfig(
-                temperature=0.4,
-                max_output_tokens=2048,
+        ai_coaching=AICoaching(
+            overall_risk_level=coaching.get("overall_risk_level", "Moderate"),
+            overall_summary=coaching.get("overall_summary", ""),
+            priority_issue=coaching.get("priority_issue", ""),
+            coaching_cues=(coaching.get("coaching_cues") or ["", "", ""])[:5],
+            exercise_prescription=exercises[:5],
+            warmup_routine=warmup[:4],
+            weekly_plan=weekly[:5],
+            positive_observation=coaching.get("positive_observation", ""),
+            follow_up_timeline=coaching.get("follow_up_timeline", ""),
+            individual_feedback=IndividualFeedback(
+                knee_valgus_left=individual.get("knee_valgus_left", ""),
+                knee_valgus_right=individual.get("knee_valgus_right", ""),
+                trunk_lean=individual.get("trunk_lean", ""),
+                asymmetry=individual.get("asymmetry", ""),
+                shoulder_asymmetry=individual.get("shoulder_asymmetry", ""),
+                hip_drop=individual.get("hip_drop", ""),
             ),
-        )
-        prompt = build_coaching_prompt(movement_type, fitness_level, age_group, goal, scores, supplementary)
-        response = model.generate_content(prompt)
-        raw = response.text.strip()
-
-        # Strip markdown fences if present
-        if raw.startswith("```"):
-            raw = raw.split("```")[1]
-            if raw.startswith("json"):
-                raw = raw[4:]
-            raw = raw.strip()
-        if raw.endswith("```"):
-            raw = raw[:-3].strip()
-
-        coaching = json.loads(raw)
-
-        # Validate required keys — fill missing from fallback
-        required_keys = [
-            "overall_risk_level", "overall_summary", "priority_issue",
-            "coaching_cues", "exercise_prescription", "positive_observation",
-            "follow_up_timeline", "individual_feedback",
-        ]
-        fallback = _personalize_fallback(scores, movement_type)
-        for key in required_keys:
-            if key not in coaching or not coaching[key]:
-                logger.warning(f"Gemini response missing key '{key}' — using fallback")
-                coaching[key] = fallback[key]
-
-        return coaching
-
-    except Exception as exc:
-        logger.error(f"Gemini API error: {exc} — using static fallback coaching")
-        return _personalize_fallback(scores, movement_type)
+            sport_specific_note=coaching.get("sport_specific_note", ""),
+        ),
+        annotated_frame=annotated_b64,
+        annotated_frames=annotated_frames_model,
+        frame_timeline=frame_timeline,
+    )
 
 
-def _personalize_fallback(scores: dict, movement_type: str) -> dict:
-    """Return a copy of STATIC_FALLBACK with risk level adjusted to actual scores."""
-    import copy
-    coaching = copy.deepcopy(STATIC_FALLBACK)
-    overall = scores["overall"]
-    if overall <= 30:
-        coaching["overall_risk_level"] = "Low"
-        coaching["overall_summary"] = (
-            f"Your {movement_type} analysis shows excellent movement quality with low injury risk. "
-            "Your biomechanical patterns are well-controlled. Keep up the great work and focus on "
-            "maintaining this quality as you increase load or intensity."
-        )
-        coaching["positive_observation"] = (
-            "Exceptional movement quality across all measured parameters. Your joint alignment, "
-            "trunk control, and bilateral symmetry are all within optimal ranges — a testament "
-            "to your training discipline."
-        )
-    elif overall <= 60:
-        coaching["overall_risk_level"] = "Moderate"
-    else:
-        coaching["overall_risk_level"] = "High"
-        coaching["overall_summary"] = (
-            f"Your {movement_type} shows significant biomechanical risk factors that require "
-            "immediate attention. Multiple parameters are outside safe ranges. We strongly "
-            "recommend working with a physiotherapist before increasing training volume."
-        )
-    return coaching
-
-
-# ─────────────────────────────────────────────
-# ENDPOINTS
-# ─────────────────────────────────────────────
+# ─── Endpoints ──────────────────────────────────────────────────────────────
 
 @app.get("/health")
 async def health_check():
-    uptime_seconds = int(time.time() - START_TIME)
     return {
-        "status": "healthy",
+        "status": "ok",
+        "app_name": settings.APP_NAME,
+        "version": settings.VERSION,
         "model": "gemini-2.0-flash",
         "mediapipe_version": mp.__version__,
-        "uptime_seconds": uptime_seconds,
-        "gemini_configured": bool(GEMINI_API_KEY),
+        "ai_available": ai_coach.available,
+        "uptime_seconds": int(time.time() - START_TIME),
+        "supported_movements": len(SUPPORTED_MOVEMENTS),
     }
 
 
-@app.post("/analyze")
+@app.get("/movements", response_model=list[MovementInfo])
+async def list_movements():
+    """Return metadata for all supported movement types."""
+    return SUPPORTED_MOVEMENTS
+
+
+@app.post(
+    "/analyze",
+    response_model=AnalysisResponse,
+    responses={
+        422: {"model": ErrorResponse, "description": "Unprocessable video"},
+        413: {"model": ErrorResponse, "description": "File too large"},
+        500: {"model": ErrorResponse, "description": "Internal server error"},
+    },
+)
 async def analyze_video(
     file: UploadFile = File(...),
     movement_type: str = Form(default="Squat"),
     fitness_level: str = Form(default="Intermediate"),
     age_group: str = Form(default="25–34"),
     goal: str = Form(default="Injury Prevention"),
+    sport: str = Form(default=""),
 ):
     request_start = time.time()
-    logger.info(f"Analysis request — movement: {movement_type}, fitness: {fitness_level}")
+    logger.info(
+        f"Analysis — movement: {movement_type!r}, fitness: {fitness_level!r}, "
+        f"age: {age_group!r}, goal: {goal!r}, sport: {sport!r}"
+    )
 
-    # Validate file type
     file_ext = Path(file.filename or "").suffix.lower()
     if file_ext not in ALLOWED_EXTENSIONS:
         raise HTTPException(
             status_code=422,
-            detail=f"Unsupported file type '{file_ext}'. Please upload an MP4, MOV, or AVI video.",
+            detail=(
+                f"Unsupported file type '{file_ext or 'unknown'}'. "
+                "Please upload an MP4, MOV, or AVI video file."
+            ),
         )
 
-    content_type = file.content_type or ""
-    if content_type and content_type not in ALLOWED_MIME_TYPES:
-        logger.warning(f"Unexpected content-type: {content_type} — proceeding by extension")
+    ct = file.content_type or ""
+    if ct and ct not in ALLOWED_MIME_TYPES:
+        logger.warning(f"Unexpected content-type '{ct}' for extension '{file_ext}'")
 
-    # Read and validate file size
-    content = await file.read()
-    if len(content) > MAX_FILE_SIZE_BYTES:
+    content  = await file.read()
+    max_bytes = settings.MAX_VIDEO_SIZE_MB * 1024 * 1024
+    if len(content) > max_bytes:
+        size_mb = len(content) / 1024 / 1024
         raise HTTPException(
             status_code=413,
-            detail=f"File size {len(content) / 1024 / 1024:.1f}MB exceeds the 100MB limit.",
+            detail=(
+                f"File size {size_mb:.1f} MB exceeds the {settings.MAX_VIDEO_SIZE_MB} MB limit. "
+                "Please compress your video or trim it to a shorter clip."
+            ),
         )
 
-    tmp_path = None
+    analysis_id = uuid.uuid4().hex
+    tmp_path: str | None = None
+
     try:
-        # Write to temp file
-        suffix = f"_{uuid.uuid4().hex}{file_ext}"
+        suffix = f"_{analysis_id}{file_ext}"
         with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
             tmp.write(content)
             tmp_path = tmp.name
 
-        logger.info(f"Saved temp video: {tmp_path} ({len(content) / 1024:.0f} KB)")
+        logger.info(f"Video saved to {tmp_path} ({len(content) / 1024:.0f} KB)")
 
-        # Extract pose data
+        # 1. Extract pose landmarks
         try:
-            frame_data = extract_pose_data(tmp_path)
+            frames, metadata = pose_extractor.extract(tmp_path)
         except ValueError as exc:
             raise HTTPException(status_code=422, detail=str(exc))
 
-        logger.info(f"Pose extracted: {len(frame_data)} valid frames")
+        logger.info(f"Pose extraction: {len(frames)} valid frames")
 
-        # Compute risk scores
-        risk = compute_risk_scores(frame_data)
-        scores = risk["scores"]
-        supplementary = risk["supplementary"]
+        # 2. Biomechanical analysis (movement-aware)
+        frame_flags, avg_stats = biomechanics_engine.analyze(frames, movement_type)
 
-        # Annotate worst frame
-        annotated_b64 = annotate_frame(
-            frame_data, supplementary["worst_frame_index"], scores
+        # 3. Risk scoring
+        scores     = risk_scorer.score(frame_flags, movement_type)
+        risk_level = _risk_level_from_score(scores["overall"])
+
+        # 4. Annotate frames
+        worst_valid_idx  = avg_stats["worst_frame_index"]
+        best_valid_idx   = avg_stats["best_frame_index"]
+        middle_valid_idx = avg_stats["middle_frame_index"]
+
+        valid_indices = metadata["valid_frame_indices"]
+        worst_actual  = valid_indices[worst_valid_idx]
+        best_actual   = valid_indices[best_valid_idx]
+        middle_actual = valid_indices[middle_valid_idx]
+
+        annotated_b64  = frame_annotator.annotate(tmp_path, worst_actual, scores, risk_level)
+        annotated_set  = frame_annotator.annotate_multiple(
+            tmp_path, worst_actual, best_actual, middle_actual, scores, risk_level
         )
 
-        # Get AI coaching
-        ai_coaching = get_ai_coaching(
-            movement_type, fitness_level, age_group, goal, scores, supplementary
-        )
+        # 5. AI coaching
+        athlete_context = {
+            "fitness_level": fitness_level,
+            "age_group":     age_group,
+            "goal":          goal,
+            "sport":         sport,
+        }
+        coaching = ai_coach.generate(scores, avg_stats, movement_type, athlete_context)
+
+        # 6. Movement Quality Score + Injury Probability (Features 5, 12)
+        mqs_result = risk_scorer.calculate_mqs(scores)
+        injury_prob = risk_scorer.calculate_injury_probability(scores, avg_stats)
+
+        avg_stats["mqs_score"]            = mqs_result["mqs_score"]
+        avg_stats["mqs_grade"]            = mqs_result["mqs_grade"]
+        avg_stats["mqs_percentile"]       = mqs_result["mqs_percentile"]
+        avg_stats["injury_probability_4w"] = injury_prob
+
+        # 7. Frame timeline (downsampled for charting)
+        frame_timeline = _build_frame_timeline(frame_flags)
 
         elapsed = round(time.time() - request_start, 2)
-        logger.info(f"Analysis complete in {elapsed}s — overall risk: {scores['overall']}")
+        logger.info(
+            f"Analysis {analysis_id} complete in {elapsed}s — "
+            f"overall: {scores['overall']}% ({risk_level}), "
+            f"reps: {avg_stats.get('rep_count', 0)}, fatigue: {avg_stats.get('fatigue_score', 0)}%"
+        )
 
-        return JSONResponse({
-            "movement_type": movement_type,
-            "scores": scores,
-            "supplementary": supplementary,
-            "ai_coaching": ai_coaching,
-            "annotated_frame": annotated_b64,
-        })
+        return _build_response(
+            analysis_id=analysis_id,
+            movement_type=movement_type,
+            scores=scores,
+            avg_stats=avg_stats,
+            n_frames=len(frames),
+            coaching=coaching,
+            annotated_b64=annotated_b64,
+            annotated_frames_dict=annotated_set,
+            frame_timeline=frame_timeline,
+            metadata=metadata,
+        )
 
     except HTTPException:
         raise
-    except Exception as exc:
-        logger.error(f"Unexpected error during analysis: {exc}\n{traceback.format_exc()}")
+    except Exception:
+        logger.error(f"Unexpected error:\n{traceback.format_exc()}")
         raise HTTPException(
             status_code=500,
-            detail="An unexpected error occurred during video analysis. Please try again.",
+            detail=(
+                "An unexpected error occurred while processing your video. "
+                "Please try again. If the problem persists, try a different video format."
+            ),
         )
     finally:
         if tmp_path and os.path.exists(tmp_path):
             try:
                 os.unlink(tmp_path)
             except OSError as e:
-                logger.warning(f"Failed to delete temp file {tmp_path}: {e}")
+                logger.warning(f"Could not delete temp file {tmp_path}: {e}")

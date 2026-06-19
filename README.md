@@ -8,29 +8,34 @@
 [![MediaPipe](https://img.shields.io/badge/MediaPipe-0.10-FF6F00?style=flat&logo=google)](https://mediapipe.dev)
 [![Gemini](https://img.shields.io/badge/Gemini-2.0_Flash-4285F4?style=flat&logo=google)](https://aistudio.google.com)
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind-3.4-38B2AC?style=flat&logo=tailwind-css)](https://tailwindcss.com)
-[![PhysTech 2026](https://img.shields.io/badge/PhysTech-2026_Hackathon-6366f1?style=flat)](https://phystech2026.io)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
 ---
 
-## What Problem It Solves
+## What It Does
 
-Access to professional sports physiotherapy is expensive and often inaccessible. Athletes and fitness enthusiasts frequently train without understanding the injury risks embedded in their movement patterns — until they're injured.
+Access to professional sports physiotherapy is expensive and often inaccessible. Athletes train without understanding the injury risks in their movement patterns — until they're injured.
 
-**InjuryLens** democratizes this expertise. A user records themselves performing any physical movement, uploads the video, and within seconds receives a comprehensive report that rivals what a sports physiotherapist would provide:
+**InjuryLens** bridges this gap. Record any movement, upload the video, and receive a comprehensive clinical-grade report in seconds:
 
-- **Pose analysis** using MediaPipe's 33-landmark body model across every frame
-- **Quantified injury risk scores** for knee valgus (left & right), trunk lean, and bilateral asymmetry
-- **AI-generated coaching** tailored to the athlete's profile via Gemini 2.0 Flash
-- **Exercise prescription** with specific sets, reps, and clinical justification
-- **Annotated movement frame** highlighting the highest-risk moment in the video
+- **6 biomechanical risk metrics** — knee valgus (left & right), trunk lean, bilateral asymmetry, shoulder height asymmetry, hip drop
+- **Automatic rep counting** — detects repetitions from joint angle oscillations
+- **Fatigue detection** — compares form quality between the first and second halves of your session
+- **Frame-by-frame angle timeline** — chart showing joint angles across every frame
+- **3-frame annotated gallery** — worst, best, and middle frames with skeleton overlay
+- **AI coaching report** — personalised via Gemini 2.0 Flash: 5 movement cues, 5 exercises, warm-up routine, 5-day training plan
+- **12 supported movement types** — from Squat to Bench Press
+- **Webcam recording** — record directly in the browser
+- **Analysis history** — save and revisit past analyses (stored locally)
+- **Progress dashboard** — track your risk scores over time with Recharts
+- **Comparison mode** — side-by-side analysis of two sessions
+- **Text report export** — download a full clinical summary as a .txt file
 
 ---
 
 ## Screenshots
 
-> *(Add screenshots here after first run)*
-
-| Upload Screen | Loading / Analysis | Results Report |
+| Upload Screen | Loading | Results Report |
 |:---:|:---:|:---:|
 | `screenshot-upload.png` | `screenshot-loading.png` | `screenshot-results.png` |
 
@@ -54,7 +59,7 @@ Access to professional sports physiotherapy is expensive and often inaccessible.
 3. Click **"Create API key"**
 4. Copy the key — it starts with `AIza...`
 
-The free tier is sufficient for this application (handles ~60 requests/minute).
+The free tier handles ~60 requests/minute, sufficient for personal use.
 
 ---
 
@@ -64,8 +69,8 @@ The free tier is sufficient for this application (handles ~60 requests/minute).
 # 1. Navigate to the backend directory
 cd InjuryLens/backend
 
-# 2. Create a virtual environment (strongly recommended)
-python -m venv venv
+# 2. Create a Python 3.11 virtual environment (recommended)
+py -3.11 -m venv venv
 
 # Windows
 venv\Scripts\activate
@@ -73,21 +78,21 @@ venv\Scripts\activate
 # macOS / Linux
 source venv/bin/activate
 
-# 3. Install Python dependencies
+# 3. Install dependencies
 pip install -r requirements.txt
 
-# 4. Set your Gemini API key
+# 4. Configure your Gemini API key
 cp .env.example .env
-# Edit .env and replace the placeholder with your actual key:
-# GEMINI_API_KEY=AIzaYourActualKeyHere
+# Edit .env:  GEMINI_API_KEY=AIzaYourActualKeyHere
 
-# 5. Start the FastAPI server
+# 5. Start the server
 uvicorn main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-The backend will be available at `http://localhost:8000`.
+Backend endpoints:
 - Health check: `http://localhost:8000/health`
-- API docs: `http://localhost:8000/docs`
+- Supported movements: `http://localhost:8000/movements`
+- Interactive API docs: `http://localhost:8000/docs`
 
 ---
 
@@ -97,87 +102,102 @@ The backend will be available at `http://localhost:8000`.
 # 1. Navigate to the frontend directory
 cd InjuryLens/frontend
 
-# 2. Install Node.js dependencies
+# 2. Install dependencies
 npm install
 
-# 3. Start the development server
+# 3. Start the dev server
 npm run dev
 ```
 
-Open [http://localhost:5173](http://localhost:5173) in your browser.
+Open `http://localhost:5173` in your browser.
 
-The Vite dev server is pre-configured to proxy `/analyze` and `/health` to the backend at `localhost:8000`, so no CORS issues during development.
-
----
-
-## How to Use InjuryLens
-
-1. **Record your movement** — Use your phone or webcam to record yourself performing a squat, run, lunge, jump landing, push-up, deadlift, or plank. Ensure your full body is visible and the lighting is good.
-
-2. **Upload the video** — Drag and drop (or click to browse) your MP4, MOV, or AVI file (up to 100 MB) onto the upload zone.
-
-3. **Configure your profile** — Select your movement type, fitness level, age group, and goal from the dropdown menus.
-
-4. **Click "Analyze Movement"** — The backend processes your video through MediaPipe and Gemini AI. This takes 10–25 seconds depending on video length.
-
-5. **Review your report** — The Results screen presents your risk scores, an annotated frame, AI coaching cues, a personalized exercise prescription, and a follow-up timeline.
-
-6. **Export or share** — Download a text summary or copy a shareable link.
+The Vite dev server proxies `/analyze`, `/health`, and `/movements` to the backend at `localhost:8000`.
 
 ---
 
-## How the Biomechanics Analysis Works
+## How to Use
 
-### Pose Detection (MediaPipe)
+1. **Upload or record** — Drag-and-drop a video file (MP4/MOV/AVI/WebM) or click "Record with Webcam" to capture directly in the browser. Ensure your full body is visible in good lighting.
 
-MediaPipe Pose detects **33 body landmarks** in 3D space on every video frame, tracking joints from head to foot with sub-centimeter accuracy. Only frames where key landmarks (hips, knees, ankles, shoulders) have mean visibility > 50% are included in analysis.
+2. **Select your movement** — Choose from 12 movement types, filtered by category (Lower Body, Upper Body, Core, Power, Cardio, Full Body).
 
-### Angle Calculations
+3. **Set your profile** — Pick your fitness level, age group, training goal, and optionally your sport for context-specific coaching.
 
-Joint angles are computed using NumPy's arccos-based approach on the landmark coordinates:
+4. **Click Analyze** — Processing takes 15–30 seconds. The backend runs MediaPipe pose detection on every frame, then Gemini generates your report.
 
-```
-angle_at_B = arccos( dot(A−B, C−B) / (|A−B| × |C−B|) )
-```
+5. **Review your report** — See your risk scores, annotated frames, joint angle timeline, rep count, fatigue score, warm-up routine, and 5-day training plan.
 
-- **Knee angle**: hip → knee → ankle
-- **Trunk lean**: angle between torso vector (mid-hip → mid-shoulder) and vertical axis
+6. **Save & compare** — Analyses are auto-saved to History. Visit the Progress dashboard to track improvements over time, or use Comparison mode to view two sessions side-by-side.
 
-### Risk Scoring
+---
 
-Four biomechanical checks are evaluated per frame:
+## Biomechanics Analysis
 
-| Check | Flag Condition | Weight in Overall Score |
-|-------|---------------|------------------------|
-| Left Knee Valgus | Hip→Knee→Ankle angle < 165° | 30% |
-| Right Knee Valgus | Hip→Knee→Ankle angle < 165° | 30% |
-| Trunk Lean | Torso-to-vertical angle > 25° | 25% |
-| Asymmetry | Left knee angle − Right knee angle > 10° | 15% |
+### Pose Detection
+MediaPipe Pose detects **33 body landmarks** in 3D space on every frame. Only frames where mean landmark visibility exceeds 50% are included.
 
-Each score = percentage of analyzed frames where the condition was flagged (0–100).
+### Risk Metrics
 
-### AI Coaching (Gemini 2.0 Flash)
+| Metric | Method | Threshold | Weight |
+|--------|--------|-----------|--------|
+| Left Knee Valgus | Hip→Knee→Ankle angle | < 165° (movement-dependent) | 27% |
+| Right Knee Valgus | Hip→Knee→Ankle angle | < 165° (movement-dependent) | 27% |
+| Trunk Lean | Torso vector vs vertical axis | > 25–50° (movement-dependent) | 22% |
+| Bilateral Asymmetry | Left vs right knee angle diff | > 8–20° (movement-dependent) | 12% |
+| Shoulder Asymmetry | Left vs right shoulder height | > 5% frame height | 7% |
+| Hip Drop | Left vs right hip height | > 4% frame height | 5% |
 
-Risk scores, average joint angles, athlete profile, and movement type are sent to Gemini 2.0 Flash with a detailed physiotherapy prompt. The model returns structured JSON with clinical interpretation, coaching cues, exercise prescription, and a follow-up timeline.
+Each score = percentage of analyzed frames where the condition was flagged (0–100%).
 
-The system degrades gracefully — if Gemini is unavailable, a clinically validated static fallback is returned automatically.
+### Supported Movements
+
+| Movement | Category | Key Focus |
+|----------|----------|-----------|
+| Squat | Lower Body | Knee valgus, trunk lean, depth |
+| Deadlift | Full Body | Hip hinge, trunk lean, bar path |
+| Lunge | Lower Body | Knee valgus, hip stability |
+| Running | Cardio | Gait symmetry, trunk lean |
+| Jump Landing | Power | ACL risk, bilateral load |
+| Push-up | Upper Body | Shoulder alignment, trunk control |
+| Plank | Core | Trunk alignment, hip sag |
+| Hip Hinge | Lower Body | Posterior chain, trunk lean |
+| Overhead Press | Upper Body | Shoulder symmetry, trunk lean |
+| Lateral Lunge | Lower Body | Frontal plane knee valgus |
+| Split Squat | Lower Body | Unilateral knee alignment |
+| Bench Press | Upper Body | Shoulder alignment, elbow flare |
+
+### AI Coaching
+Risk scores, joint angles, athlete profile, movement type, and sport context are sent to Gemini 2.0 Flash. The model returns structured JSON including:
+- Overall risk assessment
+- Priority corrective focus
+- 5 movement cues
+- 5 exercises with sets/reps and clinical justification
+- 4-item warm-up routine
+- 5-day weekly training plan
+- Individual feedback for each metric
+- Sport-specific note (when sport is provided)
+
+If Gemini is unavailable, a clinically validated adaptive fallback report is generated automatically.
 
 ---
 
 ## Tech Stack
 
-| Layer | Technology |
-|-------|-----------|
-| Backend API | FastAPI (Python) |
-| Pose Detection | MediaPipe Pose v0.10 |
-| Computer Vision | OpenCV |
-| Numerical Analysis | NumPy |
-| AI Coaching | Google Gemini 2.0 Flash |
-| Frontend Framework | React 18 + Vite |
-| Styling | Tailwind CSS |
-| Animations | Framer Motion |
-| State Management | Zustand |
-| Icons | Lucide React |
+| Layer | Technology | Version |
+|-------|-----------|---------|
+| Backend API | FastAPI | 0.111 |
+| ASGI Server | Uvicorn | 0.29 |
+| Pose Detection | MediaPipe Pose | 0.10.14 |
+| Computer Vision | OpenCV | 4.9 |
+| Numerical Analysis | NumPy | 1.26.4 |
+| AI Coaching | Google Gemini 2.0 Flash | via google-generativeai 0.7.2 |
+| Frontend Framework | React | 18.3 |
+| Build Tool | Vite | 5.3 |
+| Styling | Tailwind CSS | 3.4 |
+| Animations | Framer Motion | 11.3 |
+| State Management | Zustand (with persist) | 5.0 |
+| Charts | Recharts | 2.12 |
+| Icons | Lucide React | 0.400 |
 
 ---
 
@@ -186,25 +206,38 @@ The system degrades gracefully — if Gemini is unavailable, a clinically valida
 ```
 InjuryLens/
 ├── backend/
-│   ├── main.py              # FastAPI app, pose analysis, Gemini integration
-│   ├── requirements.txt     # Python dependencies
-│   └── .env.example         # Environment variable template
+│   ├── main.py              # FastAPI app + all endpoints
+│   ├── models.py            # Pydantic request/response schemas
+│   ├── biomechanics.py      # Joint angle calculation, rep counting, fatigue
+│   ├── scoring.py           # Frame flags → 0-100 risk scores
+│   ├── ai_coach.py          # Gemini 2.0 Flash integration + adaptive fallback
+│   ├── annotator.py         # Frame annotation with skeleton + angle labels
+│   ├── pose_extractor.py    # MediaPipe pose landmark extraction
+│   ├── config.py            # Pydantic Settings (.env)
+│   ├── requirements.txt
+│   └── .env.example
 └── frontend/
     ├── src/
     │   ├── screens/
-    │   │   ├── UploadScreen.jsx    # Upload, movement selector, profile
-    │   │   ├── LoadingScreen.jsx   # Animated skeleton + progress
-    │   │   └── ResultsScreen.jsx   # Full results report
+    │   │   ├── UploadScreen.jsx     # Upload, webcam, movement selector, profile
+    │   │   ├── LoadingScreen.jsx    # Animated skeleton + progress
+    │   │   ├── ResultsScreen.jsx    # Full results report (all sections)
+    │   │   ├── HistoryScreen.jsx    # Saved analysis browser
+    │   │   ├── DashboardScreen.jsx  # Progress charts (Recharts)
+    │   │   └── ComparisonScreen.jsx # Side-by-side analysis comparison
     │   ├── components/
-    │   │   ├── Navbar.jsx          # Fixed top navigation
-    │   │   ├── ErrorCard.jsx       # Styled error display
-    │   │   ├── AnimatedBar.jsx     # Spring-animated risk bars
-    │   │   ├── Accordion.jsx       # Expandable feedback sections
-    │   │   └── RiskGauge.jsx       # SVG semi-circle gauge
-    │   ├── App.jsx                 # Screen router with Framer Motion
-    │   ├── store.js                # Zustand global state
-    │   └── index.css               # Tailwind + custom design tokens
-    ├── index.html
+    │   │   ├── Navbar.jsx           # Navigation with history/progress links
+    │   │   ├── BodyMap.jsx          # SVG body heat map
+    │   │   ├── TimelineChart.jsx    # Joint angle timeline (Recharts)
+    │   │   ├── WebcamRecorder.jsx   # In-browser video recording
+    │   │   ├── AnimatedBar.jsx      # Spring-animated risk score bars
+    │   │   ├── RiskGauge.jsx        # SVG semi-circle gauge
+    │   │   ├── Accordion.jsx        # Expandable feedback sections
+    │   │   └── ErrorCard.jsx        # Styled error display
+    │   ├── App.jsx                  # Screen router
+    │   ├── store.js                 # Zustand state + localStorage persistence
+    │   ├── api.js                   # Fetch wrappers + report export
+    │   └── index.css                # Tailwind + design tokens
     ├── vite.config.js
     ├── tailwind.config.js
     └── package.json
@@ -214,28 +247,33 @@ InjuryLens/
 
 ## API Reference
 
-### POST /analyze
+### GET /health
+Returns server status, MediaPipe version, Gemini availability, uptime, and supported movement count.
 
-Upload a video for biomechanical analysis.
+### GET /movements
+Returns the full list of supported movement types with category, description, key metrics, and difficulty.
+
+### POST /analyze
+Upload a video for full biomechanical analysis.
 
 **Form fields:**
-- `file` — video file (MP4, MOV, AVI, max 100 MB)
-- `movement_type` — e.g., "Squat"
-- `fitness_level` — e.g., "Intermediate"
-- `age_group` — e.g., "25–34"
-- `goal` — e.g., "Injury Prevention"
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `file` | File | required | MP4, MOV, AVI, or WebM, max 100 MB |
+| `movement_type` | string | "Squat" | One of the 12 supported movements |
+| `fitness_level` | string | "Intermediate" | Beginner / Intermediate / Advanced / Elite |
+| `age_group` | string | "25–34" | Age bracket |
+| `goal` | string | "Injury Prevention" | Training goal context |
+| `sport` | string | "" | Optional sport context for AI coaching |
 
-**Response:** JSON with `movement_type`, `scores`, `supplementary`, `ai_coaching`, `annotated_frame`
-
-### GET /health
-
-Returns server status, MediaPipe version, uptime, and Gemini configuration status.
-
----
-
-## PhysTech 2026 Hackathon
-
-InjuryLens was built for the **PhysTech 2026 Hackathon**, a competition focused on applying emerging technology to sports medicine and human performance. The goal was to demonstrate that AI-assisted physiotherapy tools can be both technically rigorous and accessible to everyday athletes.
+**Response fields:**
+- `analysis_id` — unique ID for this analysis
+- `scores` — 7 risk scores (0–100) including overall
+- `supplementary` — average joint angles, rep count, fatigue score, FPS, duration
+- `ai_coaching` — full coaching report (cues, exercises, warm-up, weekly plan, etc.)
+- `annotated_frame` — base64 PNG of worst frame with skeleton overlay
+- `annotated_frames` — set of worst/best/middle annotated frames
+- `frame_timeline` — downsampled per-frame angle data for charting
 
 ---
 

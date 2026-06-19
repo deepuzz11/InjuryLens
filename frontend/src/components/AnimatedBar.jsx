@@ -1,47 +1,76 @@
-import React, { useEffect, useState } from 'react'
+import React from 'react'
 import { motion } from 'framer-motion'
 
 function getRiskMeta(score) {
-  if (score <= 30) return { color: '#22c55e', label: 'Low Risk', textColor: 'text-success' }
-  if (score <= 60) return { color: '#f59e0b', label: 'Moderate', textColor: 'text-warning' }
-  return { color: '#ef4444', label: 'High Risk', textColor: 'text-danger' }
+  if (score <= 30) return { color: '#22c55e', label: 'Low Risk' }
+  if (score <= 60) return { color: '#f59e0b', label: 'Moderate' }
+  return { color: '#ef4444', label: 'High Risk' }
 }
 
-export default function AnimatedBar({ label, subtitle, score, delay = 0 }) {
-  const { color, label: riskLabel, textColor } = getRiskMeta(score)
+/**
+ * Props
+ * -----
+ * score    : number 0–100
+ * label    : string — check name
+ * subtitle : string — one-line explanation of what the check measures
+ * delay    : number — Framer Motion animation delay in seconds (default 0)
+ */
+export default function AnimatedBar({ score, label, subtitle, delay = 0 }) {
+  const { color, label: riskLabel } = getRiskMeta(score ?? 0)
+  const safeScore = Math.max(0, Math.min(100, score ?? 0))
 
   return (
     <div className="flex flex-col gap-1.5">
-      <div className="flex items-center justify-between">
-        <div>
-          <span className="text-sm font-medium text-text-primary">{label}</span>
+      {/* Label row */}
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-sm font-medium text-text-primary leading-snug">{label}</p>
           {subtitle && (
-            <p className="text-xs text-text-muted mt-0.5">{subtitle}</p>
+            <p className="text-xs text-text-muted mt-0.5 leading-snug">{subtitle}</p>
           )}
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">
-          <span className="font-mono text-sm font-semibold" style={{ color }}>
-            {score}%
+          <span
+            className="font-mono text-sm font-semibold tabular-nums"
+            style={{ color }}
+          >
+            {safeScore}%
           </span>
           <span
-            className="text-xs px-2 py-0.5 rounded-full font-medium"
+            className="text-xs px-2 py-0.5 rounded-full font-medium whitespace-nowrap"
             style={{
               color,
-              background: `${color}18`,
-              border: `1px solid ${color}30`,
+              background: `${color}1a`,
+              border: `1px solid ${color}33`,
             }}
           >
             {riskLabel}
           </span>
         </div>
       </div>
-      <div className="h-2 bg-bg-elevated rounded-full overflow-hidden">
+
+      {/* Animated bar */}
+      <div
+        className="h-2 rounded-full overflow-hidden"
+        style={{ background: 'rgba(255,255,255,0.06)' }}
+        role="progressbar"
+        aria-valuenow={safeScore}
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-label={`${label}: ${safeScore}%`}
+      >
         <motion.div
-          initial={{ width: 0 }}
-          animate={{ width: `${score}%` }}
-          transition={{ delay, duration: 0.8, type: 'spring', stiffness: 80, damping: 15 }}
           className="h-full rounded-full"
           style={{ background: color }}
+          initial={{ width: 0 }}
+          animate={{ width: `${safeScore}%` }}
+          transition={{
+            delay,
+            duration: 1.0,
+            type: 'spring',
+            stiffness: 60,
+            damping: 20,
+          }}
         />
       </div>
     </div>

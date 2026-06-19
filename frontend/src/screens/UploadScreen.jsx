@@ -1,78 +1,79 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
-  Upload, Play, ChevronDown, AlertCircle, Zap, Brain, Shield,
-  Dumbbell, PersonStanding, Footprints, ArrowDown, Activity,
-  Target, BarChart3, X, FileVideo,
+  Upload, Play, ChevronDown, Zap, Brain, Shield,
+  Dumbbell, Footprints, ArrowDown, Activity,
+  Target, BarChart3, X, FileVideo, Camera,
+  RotateCcw, Layers, TrendingUp, Heart, User, Video, Map,
 } from 'lucide-react'
 import { useStore } from '../store'
+import { analyzeVideo } from '../api'
 import Navbar from '../components/Navbar'
 import ErrorCard from '../components/ErrorCard'
+import WebcamRecorder from '../components/WebcamRecorder'
+import CameraGuide from '../components/CameraGuide'
 
 const MOVEMENTS = [
-  { id: 'Squat', label: 'Squat', Icon: ArrowDown },
-  { id: 'Running', label: 'Running', Icon: Activity },
-  { id: 'Jump Landing', label: 'Jump Landing', Icon: Zap },
-  { id: 'Lunge', label: 'Lunge', Icon: Footprints },
-  { id: 'Push-up', label: 'Push-up', Icon: Shield },
-  { id: 'Deadlift', label: 'Deadlift', Icon: Dumbbell },
-  { id: 'Plank', label: 'Plank', Icon: Target },
+  { id: 'Squat',          label: 'Squat',           Icon: ArrowDown,  category: 'Lower Body'  },
+  { id: 'Deadlift',       label: 'Deadlift',        Icon: Dumbbell,   category: 'Full Body'   },
+  { id: 'Lunge',          label: 'Lunge',           Icon: Footprints, category: 'Lower Body'  },
+  { id: 'Running',        label: 'Running',         Icon: Activity,   category: 'Cardio'      },
+  { id: 'Jump Landing',   label: 'Jump Landing',    Icon: Zap,        category: 'Power'       },
+  { id: 'Push-up',        label: 'Push-up',         Icon: Shield,     category: 'Upper Body'  },
+  { id: 'Plank',          label: 'Plank',           Icon: Target,     category: 'Core'        },
+  { id: 'Hip Hinge',      label: 'Hip Hinge',       Icon: RotateCcw,  category: 'Lower Body'  },
+  { id: 'Overhead Press', label: 'Overhead Press',  Icon: TrendingUp, category: 'Upper Body'  },
+  { id: 'Lateral Lunge',  label: 'Lateral Lunge',   Icon: Layers,     category: 'Lower Body'  },
+  { id: 'Split Squat',    label: 'Split Squat',     Icon: ArrowDown,  category: 'Lower Body'  },
+  { id: 'Bench Press',    label: 'Bench Press',     Icon: Heart,      category: 'Upper Body'  },
 ]
 
 const FITNESS_LEVELS = ['Beginner', 'Intermediate', 'Advanced', 'Elite Athlete']
-const AGE_GROUPS = ['Under 18', '18–24', '25–34', '35–44', '45–54', '55+']
-const GOALS = ['Injury Prevention', 'Performance Improvement', 'Rehabilitation', 'General Fitness']
+const AGE_GROUPS     = ['Under 18', '18–24', '25–34', '35–44', '45–54', '55+']
+const GOALS          = ['Injury Prevention', 'Performance Improvement', 'Rehabilitation', 'General Fitness', 'Sport-Specific Training']
+const SPORTS         = ['', 'Football', 'Basketball', 'Tennis', 'Running/Athletics', 'Swimming', 'Cycling', 'CrossFit', 'Weightlifting', 'Rugby', 'Martial Arts', 'Other']
+
+const CATEGORIES = ['All', ...new Set(MOVEMENTS.map((m) => m.category))]
 
 const MAX_FILE_BYTES = 100 * 1024 * 1024
-const ALLOWED_TYPES = ['video/mp4', 'video/quicktime', 'video/x-msvideo', 'video/avi']
-const ALLOWED_EXTS = ['.mp4', '.mov', '.avi']
+const ALLOWED_EXTS   = ['.mp4', '.mov', '.avi', '.webm']
+const ALLOWED_TYPES  = ['video/mp4', 'video/quicktime', 'video/x-msvideo', 'video/avi', 'video/webm']
 
-function formatBytes(bytes) {
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`
-  return `${(bytes / 1024 / 1024).toFixed(1)} MB`
+function fmtBytes(b) {
+  return b < 1024 * 1024 ? `${(b / 1024).toFixed(0)} KB` : `${(b / 1024 / 1024).toFixed(1)} MB`
 }
 
-function StyledSelect({ label, icon: Icon, value, onChange, options, id }) {
+function StyledSelect({ id, label, icon: Icon, value, onChange, options }) {
   const [open, setOpen] = useState(false)
   const ref = useRef(null)
-
   useEffect(() => {
-    function handleClick(e) {
-      if (ref.current && !ref.current.contains(e.target)) setOpen(false)
-    }
-    document.addEventListener('mousedown', handleClick)
-    return () => document.removeEventListener('mousedown', handleClick)
+    const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false) }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
   }, [])
-
+  const displayValue = value || '— None —'
   return (
-    <div ref={ref} className="relative flex-1 min-w-[160px]">
-      <label htmlFor={id} className="block text-xs font-medium text-text-secondary mb-1.5 flex items-center gap-1.5">
-        {Icon && <Icon size={12} />}
-        {label}
+    <div ref={ref} className="relative flex-1 min-w-[140px]">
+      <label htmlFor={id} className="flex items-center gap-1.5 text-xs font-medium text-text-secondary mb-1.5">
+        {Icon && <Icon size={11} aria-hidden />}{label}
       </label>
       <button
-        id={id}
-        type="button"
-        onClick={() => setOpen((o) => !o)}
-        aria-haspopup="listbox"
-        aria-expanded={open}
+        id={id} type="button" onClick={() => setOpen((o) => !o)}
+        aria-haspopup="listbox" aria-expanded={open}
         className="w-full flex items-center justify-between px-3 py-2.5 rounded-xl glass border border-border-subtle text-sm text-text-primary hover:border-border-accent transition-all duration-200 focus:outline-none focus:border-accent-primary"
       >
-        <span>{value}</span>
-        <ChevronDown
-          size={14}
-          className={`text-text-muted transition-transform duration-200 ${open ? 'rotate-180' : ''}`}
-        />
+        <span className={value ? '' : 'text-text-muted'}>{displayValue}</span>
+        <ChevronDown size={13} className="text-text-muted transition-transform duration-200" style={{ transform: open ? 'rotate(180deg)' : 'none' }} aria-hidden />
       </button>
       <AnimatePresence>
         {open && (
           <motion.ul
             role="listbox"
-            initial={{ opacity: 0, y: -6, scale: 0.97 }}
+            initial={{ opacity: 0, y: -4, scale: 0.98 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -6, scale: 0.97 }}
-            transition={{ duration: 0.15 }}
-            className="absolute z-50 mt-1 w-full rounded-xl glass-elevated border border-border-accent shadow-xl overflow-hidden"
+            exit={{ opacity: 0, y: -4, scale: 0.98 }}
+            transition={{ duration: 0.14 }}
+            className="absolute z-50 mt-1 w-full rounded-xl glass-elevated border border-border-accent shadow-xl overflow-hidden max-h-52 overflow-y-auto"
           >
             {options.map((opt) => (
               <li
@@ -80,13 +81,13 @@ function StyledSelect({ label, icon: Icon, value, onChange, options, id }) {
                 role="option"
                 aria-selected={opt === value}
                 onClick={() => { onChange(opt); setOpen(false) }}
-                className={`px-3 py-2.5 text-sm cursor-pointer transition-colors duration-150 ${
+                className={`px-3 py-2.5 text-sm cursor-pointer transition-colors duration-100 ${
                   opt === value
                     ? 'bg-accent-glow text-accent-primary font-medium'
                     : 'text-text-secondary hover:bg-white/5 hover:text-text-primary'
                 }`}
               >
-                {opt}
+                {opt || '— None —'}
               </li>
             ))}
           </motion.ul>
@@ -99,18 +100,14 @@ function StyledSelect({ label, icon: Icon, value, onChange, options, id }) {
 function HowItWorksCard({ step, icon: Icon, title, desc, delay }) {
   return (
     <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true }}
-      transition={{ delay, duration: 0.5 }}
-      className="glass rounded-2xl p-6 flex flex-col items-start gap-4 hover:-translate-y-0.5 transition-transform duration-200"
+      initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true }} transition={{ delay, duration: 0.5 }}
+      className="glass rounded-2xl p-6 flex flex-col gap-4 hover:-translate-y-0.5 transition-transform duration-200"
     >
       <div className="flex items-center gap-3">
-        <span className="w-7 h-7 rounded-full bg-accent-primary/20 text-accent-primary text-xs font-bold flex items-center justify-center border border-accent-primary/30">
-          {step}
-        </span>
+        <span className="w-7 h-7 rounded-full bg-accent-primary/20 text-accent-primary text-xs font-bold flex items-center justify-center border border-accent-primary/30">{step}</span>
         <div className="w-10 h-10 rounded-xl bg-accent-glow flex items-center justify-center">
-          <Icon size={20} className="text-accent-primary" />
+          <Icon size={20} className="text-accent-primary" aria-hidden />
         </div>
       </div>
       <div>
@@ -122,284 +119,255 @@ function HowItWorksCard({ step, icon: Icon, title, desc, delay }) {
 }
 
 export default function UploadScreen() {
-  const { setScreen, setResults, setError, error } = useStore()
+  const { setScreen, setResults, setError, error, isLoading, setLoading } = useStore()
+  const history         = useStore((s) => s.history)
+  const getActiveProfile = useStore((s) => s.getActiveProfile)
+  const activeProfile   = getActiveProfile()
 
-  const [file, setFile] = useState(null)
-  const [filePreview, setFilePreview] = useState(null)
+  const [file, setFile]                 = useState(null)
+  const [filePreview, setFilePreview]   = useState(null)
   const [videoDuration, setVideoDuration] = useState(null)
-  const [dragging, setDragging] = useState(false)
-  const [fileError, setFileError] = useState(null)
-  const [movement, setMovement] = useState('Squat')
-  const [fitnessLevel, setFitnessLevel] = useState('Intermediate')
-  const [ageGroup, setAgeGroup] = useState('25–34')
-  const [goal, setGoal] = useState('Injury Prevention')
-  const [loading, setLoading] = useState(false)
+  const [dragging, setDragging]         = useState(false)
+  const [fileError, setFileError]       = useState(null)
+  const [movement, setMovement]         = useState('Squat')
+  const [fitnessLevel, setFitnessLevel] = useState(activeProfile?.fitnessLevel ?? 'Intermediate')
+  const [ageGroup, setAgeGroup]         = useState(activeProfile?.ageGroup ?? '25–34')
+  const [goal, setGoal]                 = useState(activeProfile?.goal ?? 'Injury Prevention')
+  const [sport, setSport]               = useState(activeProfile?.sport ?? '')
+  const [catFilter, setCatFilter]       = useState('All')
+  const [showWebcam, setShowWebcam]     = useState(false)
+  const [showCameraGuide, setShowCameraGuide] = useState(false)
 
   const fileInputRef = useRef(null)
-  const videoRef = useRef(null)
+  const videoRef     = useRef(null)
 
   const validateFile = useCallback((f) => {
-    const ext = '.' + f.name.split('.').pop().toLowerCase()
+    const ext = ('.' + f.name.split('.').pop()).toLowerCase()
     if (!ALLOWED_EXTS.includes(ext) && !ALLOWED_TYPES.includes(f.type)) {
-      return 'Unsupported file type. Please upload an MP4, MOV, or AVI video.'
+      return 'Unsupported file type. Please upload MP4, MOV, AVI, or WebM.'
     }
-    if (f.size > MAX_FILE_BYTES) {
-      return `File is ${formatBytes(f.size)}. Maximum allowed size is 100 MB.`
-    }
+    if (f.size > MAX_FILE_BYTES) return `File is ${fmtBytes(f.size)} — max 100 MB.`
     return null
   }, [])
 
-  const handleFile = useCallback((f) => {
+  const acceptFile = useCallback((f) => {
     const err = validateFile(f)
     if (err) { setFileError(err); return }
     setFileError(null)
     setFile(f)
-    const url = URL.createObjectURL(f)
-    setFilePreview(url)
+    setFilePreview(URL.createObjectURL(f))
   }, [validateFile])
 
-  useEffect(() => {
-    return () => { if (filePreview) URL.revokeObjectURL(filePreview) }
-  }, [filePreview])
+  useEffect(() => () => { if (filePreview) URL.revokeObjectURL(filePreview) }, [filePreview])
 
-  const handleDrop = useCallback((e) => {
-    e.preventDefault()
-    setDragging(false)
-    const f = e.dataTransfer.files[0]
-    if (f) handleFile(f)
-  }, [handleFile])
-
-  const handleDragOver = (e) => { e.preventDefault(); setDragging(true) }
+  const handleDrop      = useCallback((e) => { e.preventDefault(); setDragging(false); const f = e.dataTransfer.files[0]; if (f) acceptFile(f) }, [acceptFile])
+  const handleDragOver  = (e) => { e.preventDefault(); setDragging(true) }
   const handleDragLeave = () => setDragging(false)
-
-  const handleInputChange = (e) => {
-    const f = e.target.files[0]
-    if (f) handleFile(f)
-  }
-
-  const handleVideoMetadata = () => {
-    if (videoRef.current) {
-      const d = videoRef.current.duration
-      const mins = Math.floor(d / 60)
-      const secs = Math.floor(d % 60)
-      setVideoDuration(mins > 0 ? `${mins}m ${secs}s` : `${secs}s`)
+  const handleInput     = (e) => { const f = e.target.files?.[0]; if (f) acceptFile(f) }
+  const handleVideoMeta = () => {
+    const d = videoRef.current?.duration
+    if (d && isFinite(d)) {
+      const m = Math.floor(d / 60), s = Math.floor(d % 60)
+      setVideoDuration(m > 0 ? `${m}m ${s}s` : `${s}s`)
     }
   }
-
-  const handleRemoveFile = (e) => {
+  const handleRemove = (e) => {
     e.stopPropagation()
-    setFile(null)
-    setFilePreview(null)
-    setVideoDuration(null)
+    setFile(null); setFilePreview(null); setVideoDuration(null)
     if (fileInputRef.current) fileInputRef.current.value = ''
   }
 
   const handleAnalyze = async () => {
-    if (!file || loading) return
+    if (!file || isLoading) return
     setLoading(true)
     setScreen('loading')
-
     const formData = new FormData()
     formData.append('file', file)
     formData.append('movement_type', movement)
     formData.append('fitness_level', fitnessLevel)
     formData.append('age_group', ageGroup)
     formData.append('goal', goal)
-
+    formData.append('sport', sport)
     try {
-      const controller = new AbortController()
-      const timeoutId = setTimeout(() => controller.abort(), 60000)
-
-      const response = await fetch('/analyze', {
-        method: 'POST',
-        body: formData,
-        signal: controller.signal,
-      })
-      clearTimeout(timeoutId)
-
-      if (!response.ok) {
-        const errData = await response.json().catch(() => ({ detail: 'Unknown error' }))
-        throw new Error(errData.detail || `Server error (${response.status})`)
-      }
-
-      const data = await response.json()
+      const data = await analyzeVideo(formData)
       setResults(data)
     } catch (err) {
-      if (err.name === 'AbortError') {
-        setError('Analysis timed out after 60 seconds. The video may be too long or the server is under load. Please try again.')
-      } else {
-        setError(err.message || 'Analysis failed. Please try again.')
-      }
-      setLoading(false)
+      setError({ message: err.message || 'Analysis failed.', suggestion: err.suggestion || 'Please check your video and try again.' })
     }
   }
 
-  const canAnalyze = file && !fileError && !loading
+  const filteredMovements = catFilter === 'All' ? MOVEMENTS : MOVEMENTS.filter((m) => m.category === catFilter)
+  const canAnalyze = Boolean(file && !fileError && !isLoading)
+  const displayError = error || (fileError ? { message: fileError, suggestion: 'Try a different file format or reduce the file size.' } : null)
 
   return (
     <div className="min-h-screen mesh-bg">
       <Navbar />
 
+      {showWebcam && (
+        <WebcamRecorder
+          onCapture={(f) => { acceptFile(f); setShowWebcam(false) }}
+          onClose={() => setShowWebcam(false)}
+        />
+      )}
+
+      <AnimatePresence>
+        {showCameraGuide && (
+          <CameraGuide movement={movement} onClose={() => setShowCameraGuide(false)} />
+        )}
+      </AnimatePresence>
+
       {/* Hero */}
       <section className="relative pt-32 pb-16 px-4">
-        <div className="max-w-4xl mx-auto text-center">
-          {/* Glow orb */}
-          <div
-            className="absolute top-24 left-1/2 -translate-x-1/2 w-[600px] h-[300px] pointer-events-none"
-            style={{
-              background: 'radial-gradient(ellipse at center, rgba(99,102,241,0.15) 0%, transparent 70%)',
-              filter: 'blur(40px)',
-            }}
-          />
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6 }}
-          >
+        <div className="max-w-4xl mx-auto text-center relative">
+          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[300px] pointer-events-none" style={{ background: 'radial-gradient(ellipse at center,rgba(99,102,241,0.15) 0%,transparent 70%)', filter: 'blur(40px)' }} />
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }}>
             <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-accent-primary/10 border border-accent-primary/20 text-accent-primary text-xs font-medium mb-6">
-              <Zap size={12} />
-              Powered by Gemini 2.0 Flash + MediaPipe
+              <Zap size={12} aria-hidden />
+              Powered by Gemini 2.0 Flash + MediaPipe Pose · 12 Movement Types
             </span>
             <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold text-text-primary leading-tight tracking-tight mb-4">
               Know Your Injury Risk{' '}
               <span className="gradient-text">Before It Happens</span>
             </h1>
             <p className="text-lg text-text-secondary max-w-2xl mx-auto leading-relaxed">
-              Upload a video of your movement and receive a comprehensive AI-powered physiotherapy
-              report with pose analysis, injury risk scores, and personalized coaching — in seconds.
+              Upload or record any movement and receive a comprehensive AI-powered physiotherapy report — pose analysis, 6 risk metrics, rep counting, fatigue detection, and a personalised weekly training plan.
             </p>
+            {/* Active profile pill */}
+            <div className="mt-5 flex items-center justify-center gap-2 flex-wrap">
+              <button
+                onClick={() => setScreen('profiles')}
+                className="flex items-center gap-2 px-3 py-1.5 rounded-full glass border border-border-subtle text-xs text-text-secondary hover:text-accent-primary hover:border-accent-primary/30 transition-all"
+              >
+                <User size={11} />
+                <span>{activeProfile?.name ?? 'Default Athlete'}</span>
+                <span className="text-text-muted">·</span>
+                <span>{activeProfile?.fitnessLevel}</span>
+              </button>
+
+              <button
+                onClick={() => setScreen('live')}
+                className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-accent-primary/15 border border-accent-primary/30 text-accent-primary text-xs font-medium hover:bg-accent-primary/25 transition-all"
+              >
+                <Video size={11} />Try Live Analysis
+              </button>
+            </div>
+
+            {history.length > 0 && (
+              <p className="mt-3 text-sm text-text-muted">
+                You have <button onClick={() => useStore.getState().setScreen('history')} className="text-accent-primary hover:underline">{history.length} saved {history.length === 1 ? 'analysis' : 'analyses'}</button> in history.
+              </p>
+            )}
           </motion.div>
         </div>
       </section>
 
-      {/* Main upload card */}
+      {/* Upload area */}
       <section className="px-4 pb-8">
         <div className="max-w-2xl mx-auto">
-          {(error || fileError) && (
-            <div className="mb-4">
-              <ErrorCard
-                message={error || fileError}
-                onRetry={() => { setFileError(null); if (error) useStore.getState().reset() }}
-              />
-            </div>
-          )}
+          <AnimatePresence>
+            {displayError && (
+              <div className="mb-4">
+                <ErrorCard
+                  message={displayError.message}
+                  suggestion={displayError.suggestion}
+                  onRetry={() => { setFileError(null); useStore.getState().reset() }}
+                />
+              </div>
+            )}
+          </AnimatePresence>
 
-          {/* Upload zone */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2, duration: 0.5 }}
-          >
+          {/* Drop zone */}
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2, duration: 0.5 }}>
             <div
               onClick={() => !file && fileInputRef.current?.click()}
               onDrop={handleDrop}
               onDragOver={handleDragOver}
               onDragLeave={handleDragLeave}
-              className={`upload-border-animated rounded-2xl p-8 cursor-pointer transition-all duration-300 ${
-                dragging ? 'upload-border-drag' : ''
-              } ${file ? 'cursor-default' : 'hover:border-accent cursor-pointer'}`}
               role={file ? undefined : 'button'}
               tabIndex={file ? undefined : 0}
-              aria-label="Upload video for analysis"
+              aria-label="Upload video for movement analysis"
               onKeyDown={(e) => { if (e.key === 'Enter' && !file) fileInputRef.current?.click() }}
+              className={`upload-border-animated rounded-2xl p-8 transition-all duration-300 ${file ? 'cursor-default' : 'cursor-pointer'} ${dragging ? 'upload-border-drag' : ''}`}
             >
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept=".mp4,.mov,.avi,video/mp4,video/quicktime,video/x-msvideo"
-                onChange={handleInputChange}
-                className="sr-only"
-                aria-label="Select video file"
-              />
-
+              <input ref={fileInputRef} type="file" accept=".mp4,.mov,.avi,.webm,video/mp4,video/quicktime,video/x-msvideo,video/webm" onChange={handleInput} className="sr-only" aria-label="Select video file" />
               <AnimatePresence mode="wait">
                 {!file ? (
-                  <motion.div
-                    key="empty"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    className="flex flex-col items-center text-center py-6"
-                  >
-                    <div className={`w-20 h-20 rounded-2xl flex items-center justify-center mb-5 transition-all duration-300 ${
-                      dragging ? 'bg-accent-primary/20 glow-indigo' : 'bg-accent-glow'
-                    }`}>
-                      <Upload size={36} className={dragging ? 'text-accent-primary' : 'text-accent-secondary'} />
+                  <motion.div key="empty" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex flex-col items-center text-center py-4">
+                    <div className={`w-20 h-20 rounded-2xl flex items-center justify-center mb-5 transition-all duration-300 ${dragging ? 'bg-accent-primary/20 glow-indigo' : 'bg-accent-glow'}`}>
+                      <Upload size={36} className={dragging ? 'text-accent-primary' : 'text-accent-secondary'} aria-hidden />
                     </div>
-                    <p className="text-xl font-semibold text-text-primary mb-2">
-                      {dragging ? 'Drop your video here' : 'Drag & drop your video'}
-                    </p>
-                    <p className="text-text-secondary text-sm mb-4">
-                      or click to browse files
-                    </p>
-                    <p className="text-xs text-text-muted">
-                      Supports MP4, MOV, AVI · Max 100 MB
-                    </p>
+                    <p className="text-xl font-semibold text-text-primary mb-2">{dragging ? 'Drop your video here' : 'Drag & drop your video'}</p>
+                    <p className="text-text-secondary text-sm mb-4">or click to browse files</p>
+                    <p className="text-xs text-text-muted">MP4 · MOV · AVI · WebM · Max 100 MB</p>
                   </motion.div>
                 ) : (
-                  <motion.div
-                    key="preview"
-                    initial={{ opacity: 0, scale: 0.97 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.97 }}
-                    className="flex gap-4 items-start"
-                  >
+                  <motion.div key="preview" initial={{ opacity: 0, scale: 0.97 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }} className="flex gap-4 items-start">
                     <div className="relative flex-shrink-0 w-32 h-24 rounded-xl overflow-hidden bg-bg-elevated">
-                      <video
-                        ref={videoRef}
-                        src={filePreview}
-                        className="w-full h-full object-cover"
-                        onLoadedMetadata={handleVideoMetadata}
-                        muted
-                      />
+                      <video ref={videoRef} src={filePreview} className="w-full h-full object-cover" onLoadedMetadata={handleVideoMeta} muted preload="metadata" />
                       <div className="absolute inset-0 flex items-center justify-center bg-black/30">
-                        <Play size={20} className="text-white" fill="white" />
+                        <Play size={20} className="text-white" fill="white" aria-hidden />
                       </div>
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold text-text-primary truncate mb-1">
-                        {file.name}
-                      </p>
-                      <div className="flex flex-wrap gap-2 text-xs text-text-muted">
-                        <span className="flex items-center gap-1">
-                          <FileVideo size={11} />
-                          {formatBytes(file.size)}
-                        </span>
-                        {videoDuration && (
-                          <span className="flex items-center gap-1">
-                            <Play size={11} />
-                            {videoDuration}
-                          </span>
-                        )}
+                      <p className="text-sm font-semibold text-text-primary truncate mb-1">{file.name}</p>
+                      <div className="flex flex-wrap gap-3 text-xs text-text-muted">
+                        <span className="flex items-center gap-1"><FileVideo size={11} aria-hidden />{fmtBytes(file.size)}</span>
+                        {videoDuration && <span className="flex items-center gap-1"><Play size={11} aria-hidden />{videoDuration}</span>}
                       </div>
-                      <button
-                        onClick={handleRemoveFile}
-                        className="mt-3 flex items-center gap-1.5 text-xs text-text-muted hover:text-danger transition-colors"
-                        aria-label="Remove selected file"
-                      >
-                        <X size={12} />
-                        Remove file
+                      <button onClick={handleRemove} className="mt-3 flex items-center gap-1.5 text-xs text-text-muted hover:text-danger transition-colors" aria-label="Remove file">
+                        <X size={12} aria-hidden />Remove file
                       </button>
                     </div>
                   </motion.div>
                 )}
               </AnimatePresence>
             </div>
+
+            {/* Webcam + Camera Guide buttons */}
+            {!file && (
+              <div className="flex gap-2 mt-2">
+                <button
+                  onClick={() => setShowWebcam(true)}
+                  className="flex-1 py-2.5 rounded-xl glass border border-border-subtle text-sm text-text-secondary hover:text-text-primary hover:border-border-accent transition-all flex items-center justify-center gap-2"
+                >
+                  <Camera size={14} aria-hidden /> Record with Webcam
+                </button>
+                <button
+                  onClick={() => setShowCameraGuide(true)}
+                  title="Camera placement guide"
+                  className="px-3 py-2.5 rounded-xl glass border border-border-subtle text-sm text-text-muted hover:text-accent-primary hover:border-accent-primary/30 transition-all flex items-center gap-1.5"
+                >
+                  <Map size={14} />Guide
+                </button>
+              </div>
+            )}
           </motion.div>
 
-          {/* Movement selector */}
-          <motion.div
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.3, duration: 0.5 }}
-            className="mt-6"
-          >
-            <label className="block text-xs font-medium text-text-secondary mb-3 flex items-center gap-1.5">
-              <Activity size={12} />
-              Select Movement Type
-            </label>
-            <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-thin">
-              {MOVEMENTS.map(({ id, label, Icon }) => (
+          {/* Movement category filter */}
+          <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3, duration: 0.5 }} className="mt-6">
+            <p className="flex items-center gap-1.5 text-xs font-medium text-text-secondary mb-3">
+              <Activity size={12} aria-hidden />Select Movement Type
+              <span className="ml-auto text-text-muted">{MOVEMENTS.length} supported</span>
+            </p>
+            {/* Category filter */}
+            <div className="flex gap-1.5 overflow-x-auto pb-1 mb-2">
+              {CATEGORIES.map((cat) => (
+                <button
+                  key={cat}
+                  onClick={() => setCatFilter(cat)}
+                  className={`flex-shrink-0 text-[11px] px-2.5 py-1 rounded-full border transition-all ${
+                    catFilter === cat
+                      ? 'bg-accent-primary/20 border-accent-primary/40 text-accent-primary'
+                      : 'border-border-subtle text-text-muted hover:text-text-secondary'
+                  }`}
+                >
+                  {cat}
+                </button>
+              ))}
+            </div>
+            <div className="flex gap-2 overflow-x-auto pb-2" role="group" aria-label="Movement type selection">
+              {filteredMovements.map(({ id, label, Icon }) => (
                 <button
                   key={id}
                   onClick={() => setMovement(id)}
@@ -410,78 +378,44 @@ export default function UploadScreen() {
                       : 'glass border border-border-subtle text-text-secondary hover:text-text-primary hover:border-border-accent'
                   }`}
                 >
-                  <Icon size={14} />
-                  {label}
+                  <Icon size={14} aria-hidden />{label}
                 </button>
               ))}
             </div>
           </motion.div>
 
           {/* About You */}
-          <motion.div
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.4, duration: 0.5 }}
-            className="mt-6 glass rounded-2xl p-5"
-          >
-            <p className="text-xs font-medium text-text-secondary mb-4 flex items-center gap-1.5">
-              <BarChart3 size={12} />
-              About You
+          <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4, duration: 0.5 }} className="mt-6 glass rounded-2xl p-5">
+            <p className="flex items-center gap-1.5 text-xs font-medium text-text-secondary mb-4">
+              <BarChart3 size={12} aria-hidden />About You
             </p>
             <div className="flex flex-wrap gap-4">
-              <StyledSelect
-                id="fitness-level"
-                label="Fitness Level"
-                icon={Dumbbell}
-                value={fitnessLevel}
-                onChange={setFitnessLevel}
-                options={FITNESS_LEVELS}
-              />
-              <StyledSelect
-                id="age-group"
-                label="Age Group"
-                icon={Shield}
-                value={ageGroup}
-                onChange={setAgeGroup}
-                options={AGE_GROUPS}
-              />
-              <StyledSelect
-                id="goal"
-                label="Your Goal"
-                icon={Target}
-                value={goal}
-                onChange={setGoal}
-                options={GOALS}
-              />
+              <StyledSelect id="fitness-level" label="Fitness Level" icon={Dumbbell}    value={fitnessLevel} onChange={setFitnessLevel} options={FITNESS_LEVELS} />
+              <StyledSelect id="age-group"     label="Age Group"     icon={Shield}      value={ageGroup}     onChange={setAgeGroup}     options={AGE_GROUPS}     />
+              <StyledSelect id="goal"          label="Your Goal"     icon={Target}      value={goal}         onChange={setGoal}         options={GOALS}          />
+              <StyledSelect id="sport"         label="Sport (opt.)"  icon={Activity}    value={sport}        onChange={setSport}        options={SPORTS}         />
             </div>
           </motion.div>
 
           {/* Analyze button */}
-          <motion.div
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.5, duration: 0.5 }}
-            className="mt-5"
-          >
+          <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5, duration: 0.5 }} className="mt-5">
             <button
               onClick={handleAnalyze}
               disabled={!canAnalyze}
-              aria-busy={loading}
-              aria-label="Analyze video for injury risk"
+              aria-busy={isLoading}
+              aria-label={canAnalyze ? 'Analyze movement video' : 'Upload a video to begin'}
               className={`w-full py-4 rounded-2xl text-base font-semibold transition-all duration-200 flex items-center justify-center gap-3 ${
                 canAnalyze
                   ? 'bg-gradient-to-r from-accent-primary to-accent-secondary text-white hover:brightness-110 hover:shadow-lg hover:shadow-accent-primary/30 active:scale-[0.99]'
                   : 'bg-bg-elevated text-text-muted cursor-not-allowed border border-border-subtle'
               }`}
             >
-              <Brain size={20} />
-              {canAnalyze ? 'Analyze Movement' : !file ? 'Upload a Video to Begin' : 'Analyzing…'}
+              {isLoading
+                ? <><div className="w-5 h-5 rounded-full border-2 border-white/30 border-t-white animate-spin" aria-hidden />Analyzing…</>
+                : <><Brain size={20} aria-hidden />{file ? 'Analyze Movement' : 'Upload a Video to Begin'}</>
+              }
             </button>
-            {!file && (
-              <p className="text-center text-xs text-text-muted mt-2">
-                Upload a video to unlock analysis
-              </p>
-            )}
+            {!file && <p className="text-center text-xs text-text-muted mt-2">Upload or record a video to unlock analysis</p>}
           </motion.div>
         </div>
       </section>
@@ -489,44 +423,54 @@ export default function UploadScreen() {
       {/* How it works */}
       <section id="how-it-works" className="px-4 py-20">
         <div className="max-w-4xl mx-auto">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            className="text-center mb-12"
-          >
+          <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="text-center mb-12">
             <h2 className="text-3xl font-bold text-text-primary mb-3">How InjuryLens Works</h2>
-            <p className="text-text-secondary">Three steps to biomechanical clarity</p>
+            <p className="text-text-secondary">Clinical-grade biomechanics analysis in three steps</p>
           </motion.div>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
-            <HowItWorksCard
-              step={1}
-              icon={Upload}
-              title="Upload Your Video"
-              desc="Record yourself performing any movement and upload it. MP4, MOV, and AVI are all supported up to 100 MB."
-              delay={0}
-            />
-            <HowItWorksCard
-              step={2}
-              icon={Brain}
-              title="AI Analyzes Your Movement"
-              desc="MediaPipe detects 33 body landmarks per frame. Our biomechanics engine scores knee valgus, trunk lean, and symmetry."
-              delay={0.1}
-            />
-            <HowItWorksCard
-              step={3}
-              icon={BarChart3}
-              title="Get Your Coaching Report"
-              desc="Gemini 2.0 Flash turns your scores into a personalized coaching plan with exercises, cues, and a recovery timeline."
-              delay={0.2}
-            />
+            <HowItWorksCard step={1} icon={Upload}    title="Upload or Record"           desc="Upload an MP4/MOV/AVI file or record directly with your webcam. Ensure your full body is visible with good lighting." delay={0} />
+            <HowItWorksCard step={2} icon={Brain}     title="AI Analyzes Your Movement"  desc="MediaPipe tracks 33 body landmarks per frame. Our engine measures 6 risk metrics, counts reps, and detects fatigue-driven form degradation." delay={0.1} />
+            <HowItWorksCard step={3} icon={BarChart3} title="Get Your Full Report"       desc="Gemini 2.0 Flash generates a personalised coaching plan with movement cues, 5 exercises, a warm-up routine, and a weekly training plan." delay={0.2} />
           </div>
         </div>
       </section>
 
-      {/* Footer */}
+      {/* Features grid */}
+      <section className="px-4 pb-20">
+        <div className="max-w-4xl mx-auto">
+          <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="text-center mb-10">
+            <h2 className="text-2xl font-bold text-text-primary mb-2">What You Get</h2>
+          </motion.div>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+            {[
+              { icon: Target, title: '6 Risk Metrics',       desc: 'Knee valgus, trunk lean, asymmetry, shoulder & hip measurements' },
+              { icon: Activity, title: 'Rep Counter',        desc: 'Automatically detects and counts repetitions from your video' },
+              { icon: TrendingUp, title: 'Fatigue Detection', desc: 'Compares form quality first vs second half of your session' },
+              { icon: Brain, title: 'AI Coaching Report',    desc: '5 exercises, warm-up routine, and 5-day training plan' },
+              { icon: BarChart3, title: 'Angle Timeline',    desc: 'Frame-by-frame joint angle chart to see form fluctuations' },
+              { icon: Layers, title: 'Progress Tracking',   desc: 'Save analyses and track your improvement over time' },
+            ].map(({ icon: Icon, title, desc }, i) => (
+              <motion.div
+                key={title}
+                initial={{ opacity: 0, y: 16 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ delay: i * 0.06 }}
+                className="glass rounded-2xl p-4 border border-border-subtle"
+              >
+                <div className="w-8 h-8 rounded-xl bg-accent-glow flex items-center justify-center mb-3">
+                  <Icon size={16} className="text-accent-primary" />
+                </div>
+                <p className="text-sm font-semibold text-text-primary mb-1">{title}</p>
+                <p className="text-xs text-text-secondary leading-relaxed">{desc}</p>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+      </section>
+
       <footer className="border-t border-border-subtle py-8 px-4 text-center text-xs text-text-muted">
-        <p>InjuryLens · PhysTech 2026 Hackathon · Built with MediaPipe, FastAPI &amp; Gemini AI</p>
+        InjuryLens · Built with MediaPipe, FastAPI &amp; Gemini AI · Not a substitute for professional medical advice
       </footer>
     </div>
   )

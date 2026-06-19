@@ -1,71 +1,152 @@
 import React from 'react'
+import { motion } from 'framer-motion'
 
-// SVG semi-circle gauge
-export default function RiskGauge({ score }) {
-  const radius = 60
-  const cx = 80
-  const cy = 80
-  const startAngle = 180
-  const endAngle = 0
+const CX = 80
+const CY = 76
+const R = 58
 
-  // Arc from 180° to 0° (left to right, top half)
-  const polarToXY = (angle, r) => {
-    const rad = (angle * Math.PI) / 180
-    return {
-      x: cx + r * Math.cos(rad),
-      y: cy + r * Math.sin(rad),
-    }
-  }
+function polar(angleDeg, r = R) {
+  const rad = (angleDeg * Math.PI) / 180
+  return { x: CX + r * Math.cos(rad), y: CY + r * Math.sin(rad) }
+}
 
-  const start = polarToXY(180, radius)
-  const end = polarToXY(0, radius)
-  const arcPath = `M ${start.x} ${start.y} A ${radius} ${radius} 0 0 1 ${end.x} ${end.y}`
+function arcPath(startDeg, endDeg) {
+  const s = polar(startDeg)
+  const e = polar(endDeg)
+  const large = Math.abs(endDeg - startDeg) > 180 ? 1 : 0
+  const sweep = endDeg > startDeg ? 1 : 0
+  return `M ${s.x} ${s.y} A ${R} ${R} 0 ${large} ${sweep} ${e.x} ${e.y}`
+}
 
-  // Needle angle: 180° (left/low) to 0° (right/high)
-  const needleAngle = 180 - score * 1.8  // 0→180°, 100→0°
-  const needleLen = 48
-  const needleTip = polarToXY(needleAngle, needleLen)
+// The gauge sweeps from 180° (left, low risk) to 0° (right, high risk)
+// score 0 → needle at 180°, score 100 → needle at 0°
+function needleAngle(score) {
+  return 180 - score * 1.8
+}
 
-  const riskColor = score <= 30 ? '#22c55e' : score <= 60 ? '#f59e0b' : '#ef4444'
+function riskColor(score) {
+  if (score <= 30) return '#22c55e'
+  if (score <= 60) return '#f59e0b'
+  return '#ef4444'
+}
+
+/**
+ * Props
+ * -----
+ * score : number 0–100
+ * level : "Low" | "Moderate" | "High"
+ */
+export default function RiskGauge({ score, level }) {
+  const safeScore = Math.max(0, Math.min(100, score ?? 0))
+  const color = riskColor(safeScore)
+
+  const startAngle = 180    // left edge
+  const endAngle = 0        // right edge
+
+  // Zone boundaries (angles): green 180→126, amber 126→72, red 72→0
+  const greenEnd = 126      // 30% through the arc
+  const amberEnd = 72       // 60% through the arc
+
+  // Needle tip (start at 180° for animation, animate to final angle)
+  const finalAngle = needleAngle(safeScore)
+  const finalTip = polar(finalAngle, R - 12)
+  const initTip = polar(180, R - 12)
 
   return (
-    <svg viewBox="0 0 160 90" width="160" height="90" aria-label={`Risk gauge: ${score}%`} role="img">
+    <svg
+      viewBox="0 0 160 100"
+      width="160"
+      height="100"
+      aria-label={`Risk gauge: ${safeScore}% — ${level ?? ''} risk`}
+      role="img"
+    >
       {/* Background arc */}
       <path
-        d={arcPath}
+        d={arcPath(startAngle, endAngle)}
         fill="none"
         stroke="rgba(255,255,255,0.06)"
-        strokeWidth="12"
+        strokeWidth="10"
         strokeLinecap="round"
       />
-      {/* Green zone 0-30% */}
+
+      {/* Green zone 0–30% */}
       <path
-        d={`M ${polarToXY(180, radius).x} ${polarToXY(180, radius).y} A ${radius} ${radius} 0 0 1 ${polarToXY(126, radius).x} ${polarToXY(126, radius).y}`}
-        fill="none" stroke="#22c55e" strokeWidth="12" strokeLinecap="round" opacity="0.3"
+        d={arcPath(startAngle, greenEnd)}
+        fill="none"
+        stroke="#22c55e"
+        strokeWidth="10"
+        strokeLinecap="round"
+        opacity="0.35"
       />
-      {/* Amber zone 30-60% */}
+
+      {/* Amber zone 30–60% */}
       <path
-        d={`M ${polarToXY(126, radius).x} ${polarToXY(126, radius).y} A ${radius} ${radius} 0 0 1 ${polarToXY(72, radius).x} ${polarToXY(72, radius).y}`}
-        fill="none" stroke="#f59e0b" strokeWidth="12" strokeLinecap="round" opacity="0.3"
+        d={arcPath(greenEnd, amberEnd)}
+        fill="none"
+        stroke="#f59e0b"
+        strokeWidth="10"
+        strokeLinecap="round"
+        opacity="0.35"
       />
-      {/* Red zone 60-100% */}
+
+      {/* Red zone 60–100% */}
       <path
-        d={`M ${polarToXY(72, radius).x} ${polarToXY(72, radius).y} A ${radius} ${radius} 0 0 1 ${polarToXY(0, radius).x} ${polarToXY(0, radius).y}`}
-        fill="none" stroke="#ef4444" strokeWidth="12" strokeLinecap="round" opacity="0.3"
+        d={arcPath(amberEnd, endAngle)}
+        fill="none"
+        stroke="#ef4444"
+        strokeWidth="10"
+        strokeLinecap="round"
+        opacity="0.35"
       />
-      {/* Needle */}
-      <line
-        x1={cx} y1={cy}
-        x2={needleTip.x} y2={needleTip.y}
-        stroke={riskColor}
+
+      {/* Animated needle */}
+      <motion.line
+        x1={CX}
+        y1={CY}
+        initial={{ x2: initTip.x, y2: initTip.y }}
+        animate={{ x2: finalTip.x, y2: finalTip.y }}
+        transition={{ type: 'spring', stiffness: 60, damping: 20, delay: 0.4 }}
+        stroke={color}
         strokeWidth="2.5"
         strokeLinecap="round"
       />
+
       {/* Center dot */}
-      <circle cx={cx} cy={cy} r="4" fill={riskColor} />
-      {/* Score text */}
-      <text x={cx} y={cy + 18} textAnchor="middle" fill={riskColor} fontSize="13" fontFamily="JetBrains Mono, monospace" fontWeight="600">
-        {score}%
+      <motion.circle
+        cx={CX}
+        cy={CY}
+        r="5"
+        fill={color}
+        initial={{ scale: 0 }}
+        animate={{ scale: 1 }}
+        transition={{ delay: 0.3, type: 'spring', stiffness: 200, damping: 15 }}
+        style={{ transformOrigin: `${CX}px ${CY}px` }}
+      />
+
+      {/* Score label */}
+      <text
+        x={CX}
+        y={CY + 18}
+        textAnchor="middle"
+        fill={color}
+        fontSize="14"
+        fontFamily="JetBrains Mono, monospace"
+        fontWeight="600"
+      >
+        {safeScore}%
+      </text>
+
+      {/* Risk level label */}
+      <text
+        x={CX}
+        y={CY + 32}
+        textAnchor="middle"
+        fill={color}
+        fontSize="9"
+        fontFamily="Inter, sans-serif"
+        opacity="0.8"
+      >
+        {level ? `${level} Risk` : ''}
       </text>
     </svg>
   )
