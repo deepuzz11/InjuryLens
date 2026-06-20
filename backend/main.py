@@ -110,8 +110,8 @@ def _seed_demo_user():
     finally:
         db.close()
 
-ALLOWED_EXTENSIONS = {".mp4", ".mov", ".avi"}
-ALLOWED_MIME_TYPES = {"video/mp4", "video/quicktime", "video/x-msvideo", "video/avi"}
+ALLOWED_EXTENSIONS = {".mp4", ".mov", ".avi", ".webm"}
+ALLOWED_MIME_TYPES = {"video/mp4", "video/quicktime", "video/x-msvideo", "video/avi", "video/webm"}
 
 SUPPORTED_MOVEMENTS = [
     MovementInfo(id="Squat",          label="Squat",           category="Lower Body",  description="Bilateral lower body strength assessment.", key_metrics=["knee valgus", "trunk lean", "depth", "asymmetry"], difficulty="Beginner"),
@@ -317,7 +317,7 @@ async def analyze_video(
             status_code=422,
             detail=(
                 f"Unsupported file type '{file_ext or 'unknown'}'. "
-                "Please upload an MP4, MOV, or AVI video file."
+                "Please upload an MP4, MOV, AVI, or WebM video file."
             ),
         )
 
