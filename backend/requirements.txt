@@ -13,6 +13,7 @@ aiofiles==23.2.1
 # ── Auth / DB ──────────────────────────────────────────────────────────────
 sqlalchemy==2.0.30
 passlib[bcrypt]==1.7.4
+bcrypt==4.0.1
 python-jose[cryptography]==3.3.0
 # ── Future: MongoDB (uncomment when switching DB_TYPE=mongodb) ─────────────
 # motor==3.4.0

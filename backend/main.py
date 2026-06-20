@@ -58,6 +58,12 @@ app = FastAPI(
 )
 
 
+@app.exception_handler(Exception)
+async def global_exception_handler(request, exc):
+    logger.error(f"Unhandled exception on {request.url.path}: {exc}", exc_info=True)
+    return JSONResponse(status_code=500, content={"detail": "Internal server error. Please try again."})
+
+
 class RequestLoggingMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         start    = time.time()
@@ -86,17 +92,18 @@ def on_startup():
 
 def _seed_demo_user():
     """Ensure a demo account exists so users can try the app without registering."""
+    import bcrypt as _bcrypt
     from database import SessionLocal
     from auth_models import User
-    from passlib.context import CryptContext
-    _pwd = CryptContext(schemes=["bcrypt"], deprecated="auto")
     db = SessionLocal()
     try:
-        if not db.query(User).filter(User.email == "demo@injurylens.com").first():
+        existing = db.query(User).filter(User.email == "demo@injurylens.com").first()
+        if not existing:
+            hashed = _bcrypt.hashpw(b"demo1234", _bcrypt.gensalt()).decode()
             db.add(User(
                 name="Demo Athlete",
                 email="demo@injurylens.com",
-                hashed_password=_pwd.hash("demo1234"),
+                hashed_password=hashed,
             ))
             db.commit()
             logger.info("Demo user created: demo@injurylens.com / demo1234")

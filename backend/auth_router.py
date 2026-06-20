@@ -2,10 +2,10 @@ import secrets
 import logging
 from datetime import datetime, timedelta, timezone
 
+import bcrypt as _bcrypt
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from jose import JWTError, jwt
-from passlib.context import CryptContext
 
 from database import get_db
 from auth_models import User
@@ -17,16 +17,18 @@ from config import settings
 
 logger   = logging.getLogger(__name__)
 router   = APIRouter(prefix="/auth", tags=["auth"])
-pwd_ctx  = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
 
 def _hash(password: str) -> str:
-    return pwd_ctx.hash(password)
+    return _bcrypt.hashpw(password.encode(), _bcrypt.gensalt()).decode()
 
 def _verify(plain: str, hashed: str) -> bool:
-    return pwd_ctx.verify(plain, hashed)
+    try:
+        return _bcrypt.checkpw(plain.encode(), hashed.encode())
+    except Exception:
+        return False
 
 def _create_token(data: dict) -> str:
     payload = data.copy()
