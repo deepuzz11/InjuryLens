@@ -142,13 +142,13 @@ export default function HistoryScreen() {
     : history.filter((h) => h.movement_type === filter)
 
   const handleSelect = (entry) => {
-    // Navigate to comparison if compare data set, else view details
     if (compareData && compareData.id !== entry.id) {
       setCompareData({ ...compareData, second: entry })
       setScreen('comparison')
     } else {
-      // Show a summary — in future could deep-link to full results
-      alert(`Analysis from ${new Date(entry.date).toLocaleDateString()}\nMovement: ${entry.movement_type}\nOverall Risk: ${entry.scores?.overall}% (${entry.ai_coaching?.overall_risk_level})\n\nSummary:\n${entry.ai_coaching?.overall_summary}`)
+      // Load the history entry into the results screen.
+      // analysis_id must match entry.id so _saveToHistory deduplicates correctly.
+      setResults({ ...entry, analysis_id: entry.id })
     }
   }
 

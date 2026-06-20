@@ -56,6 +56,9 @@ export default function LiveAnalysisScreen() {
   const [repCount, setRepCount] = useState(0)
   const [riskFlag, setRiskFlag] = useState(null)
   const [movement, setMovement] = useState('Squat')
+  // Keep a ref in sync with movement state so detectLoop() always reads the
+  // current value without being re-created on every dropdown change.
+  const movementRef = useRef('Squat')
 
   const MOVEMENT_THRESHOLDS = {
     Squat:        { valgus: 165, trunk: 30 },
@@ -129,7 +132,6 @@ export default function LiveAnalysisScreen() {
 
     const ctx  = canvas.getContext('2d')
     const lmkr = landmarkerRef.current
-    const thresh = MOVEMENT_THRESHOLDS[movement] ?? MOVEMENT_THRESHOLDS.Squat
 
     let lastTime = -1
 
@@ -139,6 +141,8 @@ export default function LiveAnalysisScreen() {
       const ts = now
       if (Math.abs(ts - lastTime) < 30) return // cap at ~30 fps for perf
       lastTime = ts
+      // Re-read on every frame so mid-session dropdown changes take effect immediately.
+      const thresh = MOVEMENT_THRESHOLDS[movementRef.current] ?? MOVEMENT_THRESHOLDS.Squat
 
       canvas.width  = video.videoWidth  || 640
       canvas.height = video.videoHeight || 480
@@ -236,7 +240,7 @@ export default function LiveAnalysisScreen() {
             <div className="flex gap-2">
               <select
                 value={movement}
-                onChange={(e) => { setMovement(e.target.value); angleHistRef.current = [] }}
+                onChange={(e) => { movementRef.current = e.target.value; setMovement(e.target.value); angleHistRef.current = [] }}
                 className="px-3 py-2 rounded-xl glass border border-border-subtle text-sm text-text-primary bg-transparent focus:outline-none"
               >
                 {Object.keys(MOVEMENT_THRESHOLDS).map((m) => <option key={m}>{m}</option>)}

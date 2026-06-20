@@ -1,9 +1,13 @@
 import secrets
+import smtplib
 import logging
 from datetime import datetime, timedelta, timezone
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
 
 import bcrypt as _bcrypt
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 from jose import JWTError, jwt
 
@@ -17,9 +21,53 @@ from config import settings
 
 logger   = logging.getLogger(__name__)
 router   = APIRouter(prefix="/auth", tags=["auth"])
+_bearer  = HTTPBearer()
 
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
+
+def _send_reset_email(to_email: str, token: str) -> None:
+    """Send password-reset email via SMTP if configured; otherwise log the token."""
+    if not (settings.SMTP_HOST and settings.SMTP_USER and settings.SMTP_PASSWORD):
+        logger.info(
+            "SMTP not configured — password reset token for %s: %s  "
+            "(Add SMTP_HOST/SMTP_USER/SMTP_PASSWORD to .env to send real emails.)",
+            to_email, token,
+        )
+        return
+
+    reset_url  = f"{settings.APP_URL}?reset_token={token}"
+    from_addr  = settings.SMTP_FROM or settings.SMTP_USER
+    subject    = f"{settings.APP_NAME} — Password Reset"
+    body_text  = (
+        f"A password reset was requested for your {settings.APP_NAME} account.\n\n"
+        f"Reset link (expires in 1 hour):\n{reset_url}\n\n"
+        "If you did not request this, you can safely ignore this email."
+    )
+    body_html  = (
+        f"<p>A password reset was requested for your <strong>{settings.APP_NAME}</strong> account.</p>"
+        f"<p><a href='{reset_url}'>Click here to reset your password</a> (expires in 1 hour).</p>"
+        "<p>If you did not request this, you can safely ignore this email.</p>"
+    )
+
+    msg = MIMEMultipart("alternative")
+    msg["Subject"] = subject
+    msg["From"]    = from_addr
+    msg["To"]      = to_email
+    msg.attach(MIMEText(body_text, "plain"))
+    msg.attach(MIMEText(body_html, "html"))
+
+    try:
+        with smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT, timeout=10) as smtp:
+            smtp.ehlo()
+            smtp.starttls()
+            smtp.login(settings.SMTP_USER, settings.SMTP_PASSWORD)
+            smtp.sendmail(from_addr, [to_email], msg.as_string())
+        logger.info("Password reset email sent to %s", to_email)
+    except Exception as exc:
+        logger.error("Failed to send reset email to %s: %s", to_email, exc)
+        logger.info("Manual fallback — reset token for %s: %s", to_email, token)
+
 
 def _hash(password: str) -> str:
     return _bcrypt.hashpw(password.encode(), _bcrypt.gensalt()).decode()
@@ -75,8 +123,7 @@ def forgot_password(body: ForgotPasswordRequest, db: Session = Depends(get_db)):
         user.reset_token         = token
         user.reset_token_expires = datetime.now(timezone.utc) + timedelta(hours=1)
         db.commit()
-        # TODO: send actual email in production
-        logger.info("Password reset token for %s: %s", user.email, token)
+        _send_reset_email(user.email, token)
     # Always return success — do not reveal whether email exists
     return MessageResponse(message="If that email is registered, a reset link has been sent.")
 
@@ -96,9 +143,12 @@ def reset_password(body: ResetPasswordRequest, db: Session = Depends(get_db)):
 
 
 @router.get("/me", response_model=UserOut)
-def get_me(token: str, db: Session = Depends(get_db)):
+def get_me(
+    credentials: HTTPAuthorizationCredentials = Depends(_bearer),
+    db: Session = Depends(get_db),
+):
     try:
-        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        payload = jwt.decode(credentials.credentials, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
         email   = payload.get("sub")
         user    = db.query(User).filter(User.email == email).first()
         if not user:

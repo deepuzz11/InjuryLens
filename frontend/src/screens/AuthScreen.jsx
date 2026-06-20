@@ -68,17 +68,19 @@ function Field({ label, type = 'text', value, onChange, placeholder, autoFocus }
 }
 
 /* ── main ────────────────────────────────────────────────────────────── */
-// tab: 'login' | 'signup' | 'forgot'
+// tab: 'login' | 'signup' | 'forgot' | 'reset'
 export default function AuthScreen({ defaultTab = 'login', onClose }) {
-  const [tab, setTab]         = useState(defaultTab)
-  const [name, setName]       = useState('')
-  const [email, setEmail]     = useState(defaultTab === 'login' ? 'demo@injurylens.com' : '')
-  const [password, setPass]   = useState(defaultTab === 'login' ? 'demo1234' : '')
-  const [loading, setLoading] = useState(false)
-  const [error, setError]     = useState('')
-  const [success, setSuccess] = useState('')
+  const [tab, setTab]           = useState(defaultTab)
+  const [name, setName]         = useState('')
+  const [email, setEmail]       = useState(defaultTab === 'login' ? 'demo@injurylens.com' : '')
+  const [password, setPass]     = useState(defaultTab === 'login' ? 'demo1234' : '')
+  const [resetToken, setToken]  = useState('')
+  const [newPassword, setNewPw] = useState('')
+  const [loading, setLoading]   = useState(false)
+  const [error, setError]       = useState('')
+  const [success, setSuccess]   = useState('')
 
-  const { loginUser, registerUser, forgotPassword } = useStore()
+  const { loginUser, registerUser, forgotPassword, resetPassword } = useStore()
 
   const switchTab = (t) => {
     setTab(t); setError(''); setSuccess('')
@@ -90,14 +92,25 @@ export default function AuthScreen({ defaultTab = 'login', onClose }) {
     e.preventDefault()
     setError(''); setSuccess(''); setLoading(true)
     try {
-      if (tab === 'login')  await loginUser(email, password)
-      else if (tab === 'signup') await registerUser(name, email, password)
-      else { const r = await forgotPassword(email); setSuccess(r.message) }
+      if (tab === 'login')        await loginUser(email, password)
+      else if (tab === 'signup') {
+        if (!name.trim()) { setError('Please enter your full name.'); return }
+        await registerUser(name, email, password)
+      } else if (tab === 'forgot') {
+        const r = await forgotPassword(email)
+        setSuccess(r.message)
+        // Stay on forgot tab — user must check their email for the token
+      } else if (tab === 'reset') {
+        const r = await resetPassword(resetToken, newPassword)
+        setSuccess(r.message + ' You can now sign in.')
+        setTab('login')
+        setEmail(''); setPass('')
+      }
     } catch (err) { setError(err.message) }
     finally { setLoading(false) }
   }
 
-  const btnLabel = { login: 'Sign in', signup: 'Create account', forgot: 'Send reset link' }
+  const btnLabel = { login: 'Sign in', signup: 'Create account', forgot: 'Send reset link', reset: 'Set new password' }
 
   return (
     <motion.div
@@ -148,26 +161,45 @@ export default function AuthScreen({ defaultTab = 'login', onClose }) {
                   onChange={(e) => setName(e.target.value)} placeholder="Alex Johnson" autoFocus />
               )}
 
-              {tab === 'forgot'
-                ? <Field label="Email address" type="email" value={email}
-                    onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" autoFocus />
-                : <>
-                    <Field label="Email address" type="email" value={email}
-                      onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com"
-                      autoFocus={tab === 'login'} />
-                    <div>
-                      <Field label="Password" type="password" value={password}
-                        onChange={(e) => setPass(e.target.value)} placeholder="••••••••" />
-                      {tab === 'signup' && <PasswordStrength value={password} />}
-                    </div>
-                    {tab === 'login' && (
-                      <button type="button" onClick={() => switchTab('forgot')}
-                        className="self-end text-xs text-text-muted hover:text-accent-primary transition-colors font-medium -mt-1">
-                        Forgot password?
-                      </button>
-                    )}
-                  </>
-              }
+
+              {tab === 'forgot' && (
+                <Field label="Email address" type="email" value={email}
+                  onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" autoFocus />
+              )}
+
+              {tab === 'reset' && (
+                <>
+                  <p className="text-xs text-text-muted leading-relaxed">
+                    Enter the reset token sent to your email (or provided by your administrator), then choose a new password.
+                  </p>
+                  <Field label="Reset token" value={resetToken}
+                    onChange={(e) => setToken(e.target.value)} placeholder="Paste token here" autoFocus />
+                  <div>
+                    <Field label="New password" type="password" value={newPassword}
+                      onChange={(e) => setNewPw(e.target.value)} placeholder="••••••••" />
+                    <PasswordStrength value={newPassword} />
+                  </div>
+                </>
+              )}
+
+              {(tab === 'login' || tab === 'signup') && (
+                <>
+                  <Field label="Email address" type="email" value={email}
+                    onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com"
+                    autoFocus={tab === 'login'} />
+                  <div>
+                    <Field label="Password" type="password" value={password}
+                      onChange={(e) => setPass(e.target.value)} placeholder="••••••••" />
+                    {tab === 'signup' && <PasswordStrength value={password} />}
+                  </div>
+                  {tab === 'login' && (
+                    <button type="button" onClick={() => switchTab('forgot')}
+                      className="self-end text-xs text-text-muted hover:text-accent-primary transition-colors font-medium -mt-1">
+                      Forgot password?
+                    </button>
+                  )}
+                </>
+              )}
 
               {/* feedback */}
               <AnimatePresence>
@@ -210,7 +242,14 @@ export default function AuthScreen({ defaultTab = 'login', onClose }) {
                 }
               </motion.button>
 
-              {tab === 'forgot' && (
+              {tab === 'forgot' && success && (
+                <button type="button" onClick={() => { setSuccess(''); setTab('reset') }}
+                        className="text-center text-xs text-accent-primary hover:underline transition-colors font-medium">
+                  I have my reset token →
+                </button>
+              )}
+
+              {(tab === 'forgot' || tab === 'reset') && (
                 <button type="button" onClick={() => switchTab('login')}
                         className="text-center text-xs text-text-muted hover:text-accent-primary transition-colors">
                   ← Back to sign in

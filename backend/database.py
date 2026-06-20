@@ -29,6 +29,24 @@ def get_db():
 
 
 def init_db():
-    """Create all tables. Call once at startup."""
+    """Create all tables and apply lightweight column migrations."""
     from auth_models import User  # noqa: F401 — import so Base registers the table
+    from sqlalchemy import inspect, text
+
     Base.metadata.create_all(bind=engine)
+
+    # SQLite's CREATE TABLE IF NOT EXISTS won't add new columns to existing tables.
+    # Manually add any columns that were introduced after the initial schema.
+    if settings.DB_TYPE == "sqlite":
+        inspector = inspect(engine)
+        if inspector.has_table("users"):
+            existing = {c["name"] for c in inspector.get_columns("users")}
+            migrations = [
+                ("reset_token",         "ALTER TABLE users ADD COLUMN reset_token VARCHAR(128)"),
+                ("reset_token_expires",  "ALTER TABLE users ADD COLUMN reset_token_expires DATETIME"),
+            ]
+            with engine.connect() as conn:
+                for col, stmt in migrations:
+                    if col not in existing:
+                        conn.execute(text(stmt))
+                conn.commit()

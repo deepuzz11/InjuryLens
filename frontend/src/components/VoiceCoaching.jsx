@@ -53,7 +53,13 @@ export default function VoiceCoaching({ cues = [], summary = '', priority = '' }
     if (!SUPPORTED) return
     if (speaking && !paused) {
       synthRef.current.pause()
-      setPaused(true)
+      // Firefox implements pause() as a no-op; detect by checking the paused property.
+      if (synthRef.current.paused) {
+        setPaused(true)
+      } else {
+        synthRef.current.cancel()
+        setSpeaking(false)
+      }
     } else if (paused) {
       synthRef.current.resume()
       setPaused(false)

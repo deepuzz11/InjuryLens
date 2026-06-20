@@ -4,11 +4,26 @@ import { Video, StopCircle, X, CheckCircle, RefreshCw, AlertCircle } from 'lucid
 
 const MAX_RECORD_SECS = 60
 
+function getBestMimeType() {
+  const candidates = [
+    'video/webm;codecs=vp9',
+    'video/webm;codecs=vp8',
+    'video/webm',
+    'video/mp4;codecs=h264,aac',
+    'video/mp4',
+  ]
+  for (const t of candidates) {
+    if (typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported(t)) return t
+  }
+  return ''
+}
+
 export default function WebcamRecorder({ onCapture, onClose }) {
   const videoRef    = useRef(null)
   const mediaRef    = useRef(null)
   const chunksRef   = useRef([])
   const timerRef    = useRef(null)
+  const mimeTypeRef = useRef('')
 
   const [phase, setPhase]         = useState('idle')    // idle | recording | preview | error
   const [elapsed, setElapsed]     = useState(0)
@@ -57,10 +72,13 @@ export default function WebcamRecorder({ onCapture, onClose }) {
   const beginRecording = () => {
     if (!stream) return
     chunksRef.current = []
-    const mr = new MediaRecorder(stream, { mimeType: 'video/webm' })
+    const mimeType = getBestMimeType()
+    mimeTypeRef.current = mimeType
+    const mr = new MediaRecorder(stream, mimeType ? { mimeType } : {})
     mr.ondataavailable = (e) => { if (e.data.size > 0) chunksRef.current.push(e.data) }
     mr.onstop = () => {
-      const blob = new Blob(chunksRef.current, { type: 'video/webm' })
+      const recordedType = mimeTypeRef.current || 'video/webm'
+      const blob = new Blob(chunksRef.current, { type: recordedType })
       const url  = URL.createObjectURL(blob)
       setBlobUrl(url)
       if (videoRef.current) {
@@ -93,7 +111,9 @@ export default function WebcamRecorder({ onCapture, onClose }) {
     fetch(blobUrl)
       .then((r) => r.blob())
       .then((blob) => {
-        const file = new File([blob], `webcam_recording_${Date.now()}.webm`, { type: 'video/webm' })
+        const mime = mimeTypeRef.current || 'video/webm'
+        const ext  = mime.startsWith('video/mp4') ? 'mp4' : 'webm'
+        const file = new File([blob], `webcam_recording_${Date.now()}.${ext}`, { type: mime })
         onCapture(file)
         onClose()
       })

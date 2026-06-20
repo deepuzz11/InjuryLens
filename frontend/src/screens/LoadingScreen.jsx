@@ -117,10 +117,12 @@ export default function LoadingScreen() {
   const [progress,  setProgress]  = useState(0)
   const [litJoint,  setLitJoint]  = useState(0)
 
+  // Step label advances every ~3.5 s but stops at the last label so it never
+  // goes stale — the label stays visible while the bar is stuck at 95 %.
   useEffect(() => {
     const t = setInterval(
       () => setStepIndex((p) => Math.min(p + 1, STEPS.length - 1)),
-      2600,
+      3500,
     )
     return () => clearInterval(t)
   }, [])
@@ -133,14 +135,19 @@ export default function LoadingScreen() {
     return () => clearInterval(t)
   }, [])
 
+  // Progress bar uses a 35-second estimated duration (covers most long videos).
+  // It decelerates as it approaches 95 % so it never "stalls" abruptly — the
+  // bar keeps crawling forward until the real response arrives.
   useEffect(() => {
     const start    = Date.now()
-    const DURATION = 14000
+    const DURATION = 35000
     let rafId
     const tick = () => {
-      const pct = Math.min(((Date.now() - start) / DURATION) * 95, 95)
+      const raw = (Date.now() - start) / DURATION
+      // Apply an ease-out curve so progress slows near 95 % instead of stopping
+      const pct = Math.min(95 * (1 - Math.exp(-3 * raw)), 95)
       setProgress(pct)
-      if (pct < 95) rafId = requestAnimationFrame(tick)
+      rafId = requestAnimationFrame(tick)
     }
     rafId = requestAnimationFrame(tick)
     return () => cancelAnimationFrame(rafId)
@@ -302,7 +309,7 @@ export default function LoadingScreen() {
         </motion.div>
 
         <p className="mt-14 text-xs text-text-muted text-center max-w-xs leading-relaxed relative z-10">
-          Analyzing your biomechanics with AI — this usually takes 10–25 seconds
+          Analyzing your biomechanics with AI — this usually takes 15–45 seconds
           depending on video length and server load.
         </p>
       </div>

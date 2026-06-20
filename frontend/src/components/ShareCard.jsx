@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react'
-import { Share2, Download, QrCode, X, Loader } from 'lucide-react'
+import { Share2, Download, QrCode, X, Loader, Check } from 'lucide-react'
 
 function RiskColor(level) {
   return { Low: '#22c55e', Moderate: '#f59e0b', High: '#ef4444' }[level] ?? '#6366f1'
@@ -109,6 +109,7 @@ export default function ShareCard({ results }) {
   const [cardUrl, setCardUrl] = useState(null)
   const [qrUrl,   setQrUrl]   = useState(null)
   const [loading, setLoading] = useState(false)
+  const [copied,  setCopied]  = useState(false)
 
   useEffect(() => {
     if (!open || cardUrl) return
@@ -120,11 +121,16 @@ export default function ShareCard({ results }) {
         const card = await buildShareCard(results)
         if (!cancelled) setCardUrl(card)
 
-        // QR code for the current page URL
-        const QRCode = await import('qrcode')
-        const pageUrl = `${window.location.origin}${window.location.pathname}`
-        const qr = await QRCode.default.toDataURL(pageUrl, { width: 120, margin: 1, color: { dark: '#6366f1', light: '#0f0f1a' } })
-        if (!cancelled) setQrUrl(qr)
+        // Only generate a QR code when the app is served from a real, reachable
+        // origin. On localhost the QR would link to 127.0.0.1 which is useless
+        // on any other device, so we skip it in that case.
+        const isLocalhost = /^(localhost|127\.|::1)/.test(window.location.hostname)
+        if (!isLocalhost) {
+          const QRCode = await import('qrcode')
+          const pageUrl = `${window.location.origin}${window.location.pathname}`
+          const qr = await QRCode.default.toDataURL(pageUrl, { width: 120, margin: 1, color: { dark: '#6366f1', light: '#0f0f1a' } })
+          if (!cancelled) setQrUrl(qr)
+        }
       } catch (err) {
         console.error('Share card generation failed:', err)
       } finally {
@@ -145,7 +151,7 @@ export default function ShareCard({ results }) {
 
   const copyLink = () => {
     navigator.clipboard.writeText(window.location.href)
-      .then(() => alert('Link copied!'))
+      .then(() => { setCopied(true); setTimeout(() => setCopied(false), 2500) })
       .catch(() => {})
   }
 
@@ -185,18 +191,25 @@ export default function ShareCard({ results }) {
                     <Download size={13} />Download PNG
                   </button>
                   <button onClick={copyLink}
-                    className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm glass border border-border-subtle text-text-secondary hover:text-text-primary transition-all">
-                    <Share2 size={13} />Copy Link
+                    className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm transition-all ${copied ? 'bg-success/15 border border-success/30 text-success' : 'glass border border-border-subtle text-text-secondary hover:text-text-primary'}`}>
+                    {copied ? <><Check size={13} />Copied!</> : <><Share2 size={13} />Copy Link</>}
                   </button>
                 </div>
 
-                {qrUrl && (
+                {qrUrl ? (
                   <div className="flex items-center gap-4 p-3 rounded-xl bg-bg-elevated border border-border-subtle">
                     <img src={qrUrl} alt="QR code" className="w-20 h-20 rounded-lg" />
                     <div>
                       <p className="text-xs font-semibold text-text-primary mb-1">QR Code</p>
                       <p className="text-xs text-text-muted leading-relaxed">Scan to open InjuryLens on another device or share on social media.</p>
                     </div>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-3 p-3 rounded-xl bg-bg-elevated border border-border-subtle">
+                    <QrCode size={32} className="text-text-muted flex-shrink-0" />
+                    <p className="text-xs text-text-muted leading-relaxed">
+                      QR sharing is available when InjuryLens is deployed to a public URL. Download the card above to share your results now.
+                    </p>
                   </div>
                 )}
               </>

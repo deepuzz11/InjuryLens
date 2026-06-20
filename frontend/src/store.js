@@ -95,6 +95,17 @@ export const useStore = create(
         return data
       },
 
+      resetPassword: async (token, newPassword) => {
+        const res = await fetch(`${AUTH_API}/reset-password`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ token, new_password: newPassword }),
+        })
+        const data = await res.json()
+        if (!res.ok) throw new Error(data.detail || 'Reset failed.')
+        return data
+      },
+
       // ── App screens ──────────────────────────────────────────────────────────
       screen: 'upload',
       results: null,
@@ -241,7 +252,11 @@ export const useStore = create(
 
       viewHistoryItem: (id) => {
         const entry = get().history.find((h) => h.id === id)
-        if (entry) set({ screen: 'history-detail', results: null, _historyDetail: entry })
+        if (entry) {
+          // Load the history entry into the results screen.
+          // analysis_id must match entry.id so _saveToHistory deduplicates correctly.
+          get().setResults({ ...entry, analysis_id: entry.id })
+        }
       },
 
       setCompareData: (data) => set({ compareData: data }),
