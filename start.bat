@@ -47,7 +47,7 @@ echo  Starting servers...
 echo.
 
 REM ── Backend window (single-line cmd to avoid quote/continuation issues) ───
-start "InjuryLens  BACKEND  :8000" cmd /k "pushd "%BACKEND%" && call venv\Scripts\activate.bat && uvicorn main:app --reload --host 0.0.0.0 --port 8000"
+start "InjuryLens  BACKEND  :8001" cmd /k "pushd "%BACKEND%" && call venv\Scripts\activate.bat && uvicorn main:app --reload --host 0.0.0.0 --port 8001"
 
 REM ── Frontend window ────────────────────────────────────────────────────────
 start "InjuryLens  FRONTEND :5173" cmd /k "pushd "%FRONTEND%" && npm run dev"
@@ -59,7 +59,7 @@ start http://localhost:5173
 
 echo.
 echo  ================================================
-echo   Backend  ^>  http://localhost:8000
+echo   Backend  ^>  http://localhost:8001
 echo   Frontend ^>  http://localhost:5173
 echo  ================================================
 echo.
@@ -69,7 +69,7 @@ pause >nul
 
 echo.
 echo  Stopping servers...
-taskkill /FI "WINDOWTITLE eq InjuryLens  BACKEND  :8000" /T /F >nul 2>&1
+taskkill /FI "WINDOWTITLE eq InjuryLens  BACKEND  :8001" /T /F >nul 2>&1
 taskkill /FI "WINDOWTITLE eq InjuryLens  FRONTEND :5173" /T /F >nul 2>&1
 echo  All servers stopped.
 timeout /t 1 /nobreak >nul

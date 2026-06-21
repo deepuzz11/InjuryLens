@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { motion, AnimatePresence, useInView } from 'framer-motion'
 import AuthScreen from './AuthScreen'
+import { useStore } from '../store'
 
 /* ── animated counter ─────────────────────────────────────────────────── */
 function Counter({ to, suffix = '' }) {
@@ -75,8 +76,14 @@ const STEPS = [
 /* ── main ───────────────────────────────────────────────────────────────── */
 export default function LandingScreen({ onGetStarted, onSignIn }) {
   const [scrolled, setScrolled] = useState(false)
-  // 'none' | 'login' | 'signup'  — auth panel shown inline in hero
   const [authPanel, setAuthPanel] = useState('none')
+  const [demoLoading, setDemoLoading] = useState(false)
+  const loginAsDemo = useStore((s) => s.loginAsDemo)
+
+  const handleDemo = () => {
+    setDemoLoading(true)
+    setTimeout(() => { loginAsDemo(); setDemoLoading(false) }, 600)
+  }
 
   useEffect(() => {
     const fn = () => setScrolled(window.scrollY > 20)
@@ -199,6 +206,15 @@ export default function LandingScreen({ onGetStarted, onSignIn }) {
                     <motion.button onClick={openLogin} whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
                       className="px-8 py-3.5 rounded-xl font-semibold text-base glass border border-border-accent text-accent-primary hover:bg-accent-primary/8 transition-colors">
                       Sign in →
+                    </motion.button>
+                    <motion.button onClick={handleDemo} whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
+                      disabled={demoLoading}
+                      className="flex items-center gap-2 px-6 py-3.5 rounded-xl font-semibold text-sm text-text-secondary border border-border-subtle glass hover:border-warning/40 hover:text-warning transition-all"
+                      style={{ boxShadow: demoLoading ? 'none' : '0 2px 8px rgba(0,0,0,0.04)' }}>
+                      {demoLoading
+                        ? <span className="w-4 h-4 border-2 border-warning/40 border-t-warning rounded-full animate-spin" />
+                        : '⚡'}
+                      Try Demo
                     </motion.button>
                   </motion.div>
                 )}

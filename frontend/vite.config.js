@@ -6,10 +6,10 @@ export default defineConfig({
   server: {
     port: 5173,
     proxy: {
-      '/analyze':   'http://localhost:8000',
-      '/health':    'http://localhost:8000',
-      '/movements': 'http://localhost:8000',
-      '/auth':      'http://localhost:8000',
+      '/analyze':   'http://localhost:8001',
+      '/health':    'http://localhost:8001',
+      '/movements': 'http://localhost:8001',
+      '/auth':      'http://localhost:8001',
     },
     headers: {
       // Required for SharedArrayBuffer used by MediaPipe WASM runtime.

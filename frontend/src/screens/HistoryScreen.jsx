@@ -1,8 +1,9 @@
-import React, { useState } from 'react'
+import React, { useState, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Clock, Trash2, ArrowRight, AlertTriangle, CheckCircle,
   XCircle, BarChart3, GitCompareArrows, Dumbbell, ChevronRight,
+  StickyNote, X, Tag, Search,
 } from 'lucide-react'
 import { useStore } from '../store'
 
@@ -31,7 +32,145 @@ function ScorePip({ value, label }) {
   )
 }
 
-function HistoryCard({ entry, index, onSelect, onDelete, onCompare, isCompareBase }) {
+const PAIN_LEVELS = [
+  { v: 0, label: 'None', color: '#10b981' },
+  { v: 1, label: 'Mild', color: '#84cc16' },
+  { v: 2, label: 'Moderate', color: '#f59e0b' },
+  { v: 3, label: 'High', color: '#f97316' },
+  { v: 4, label: 'Severe', color: '#ef4444' },
+]
+
+const PRESET_TAGS = ['Fatigued', 'Fresh', 'Post-Workout', 'Pre-Competition', 'Rehab', 'Testing', 'Heavy Day', 'Light Day', 'Personal Best', 'Struggled']
+
+function NoteModal({ entry, noteData, onSave, onClose }) {
+  const [note, setNote]     = useState(noteData?.note ?? '')
+  const [tags, setTags]     = useState(noteData?.tags ?? [])
+  const [pain, setPain]     = useState(noteData?.painLevel ?? 0)
+  const [customTag, setCustomTag] = useState('')
+
+  function toggleTag(tag) {
+    setTags((t) => t.includes(tag) ? t.filter((x) => x !== tag) : [...t, tag])
+  }
+
+  function addCustomTag() {
+    const t = customTag.trim()
+    if (t && !tags.includes(t)) setTags((prev) => [...prev, t])
+    setCustomTag('')
+  }
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{ background: 'rgba(15,23,42,0.5)', backdropFilter: 'blur(6px)' }}
+      onClick={(e) => e.target === e.currentTarget && onClose()}
+    >
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95, y: 20 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.95 }}
+        className="glass-elevated rounded-2xl p-5 w-full max-w-md border border-border-subtle"
+        style={{ boxShadow: '0 24px 64px rgba(15,23,42,0.18)' }}
+      >
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h2 className="text-base font-bold text-text-primary">Session Notes</h2>
+            <p className="text-xs text-text-muted">{entry.movement_type} · {new Date(entry.date).toLocaleDateString()}</p>
+          </div>
+          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-bg-elevated text-text-muted"><X size={16} /></button>
+        </div>
+
+        <div className="flex flex-col gap-4">
+          {/* pain level */}
+          <div>
+            <label className="block text-xs font-semibold text-text-secondary mb-2">Pain / Discomfort Level</label>
+            <div className="flex gap-2">
+              {PAIN_LEVELS.map(({ v, label, color }) => (
+                <button
+                  key={v}
+                  type="button"
+                  onClick={() => setPain(v)}
+                  className={`flex-1 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
+                    pain === v ? 'border-2' : 'border-border-subtle text-text-muted hover:border-text-muted'
+                  }`}
+                  style={pain === v ? { borderColor: color, color, background: `${color}12` } : {}}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* tags */}
+          <div>
+            <label className="text-xs font-semibold text-text-secondary mb-2 flex items-center gap-1">
+              <Tag size={11} /> Session Tags
+            </label>
+            <div className="flex flex-wrap gap-1.5 mb-2">
+              {PRESET_TAGS.map((t) => (
+                <button
+                  key={t}
+                  type="button"
+                  onClick={() => toggleTag(t)}
+                  className={`text-xs px-2 py-1 rounded-lg border transition-all ${
+                    tags.includes(t)
+                      ? 'bg-accent-primary/15 border-accent-primary/40 text-accent-primary font-semibold'
+                      : 'border-border-subtle text-text-muted hover:border-accent-primary/30'
+                  }`}
+                >
+                  {t}
+                </button>
+              ))}
+            </div>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={customTag}
+                onChange={(e) => setCustomTag(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addCustomTag())}
+                placeholder="Add custom tag..."
+                className="flex-1 px-3 py-1.5 rounded-lg border border-border-subtle bg-bg-base text-xs text-text-primary focus:outline-none focus:border-accent-primary"
+              />
+              <button type="button" onClick={addCustomTag}
+                className="px-3 py-1.5 rounded-lg border border-accent-primary/30 text-accent-primary text-xs hover:bg-accent-primary/10 transition-colors">
+                Add
+              </button>
+            </div>
+          </div>
+
+          {/* note */}
+          <div>
+            <label className="block text-xs font-semibold text-text-secondary mb-1">Personal Notes</label>
+            <textarea
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              placeholder="How did this session feel? Any pain, observations, or context..."
+              rows={3}
+              className="w-full px-3 py-2 rounded-xl border border-border-subtle bg-bg-base text-sm text-text-primary focus:outline-none focus:border-accent-primary resize-none"
+            />
+          </div>
+
+          <div className="flex gap-2">
+            <button type="button" onClick={onClose}
+              className="flex-1 px-4 py-2 rounded-xl border border-border-subtle text-sm text-text-muted hover:bg-bg-elevated transition-colors">Cancel</button>
+            <button
+              type="button"
+              onClick={() => onSave({ note, tags, painLevel: pain })}
+              className="flex-1 px-4 py-2 rounded-xl text-sm font-semibold text-white"
+              style={{ background: 'linear-gradient(135deg, #4f46e5, #7c3aed)' }}
+            >
+              Save
+            </button>
+          </div>
+        </div>
+      </motion.div>
+    </motion.div>
+  )
+}
+
+function HistoryCard({ entry, index, onSelect, onDelete, onCompare, isCompareBase, noteData, onNoteClick }) {
   const date = new Date(entry.date)
   const timeAgo = (() => {
     const diff = Date.now() - date.getTime()
@@ -43,6 +182,8 @@ function HistoryCard({ entry, index, onSelect, onDelete, onCompare, isCompareBas
     const d = Math.floor(h / 24)
     return d === 1 ? 'yesterday' : `${d}d ago`
   })()
+
+  const painData = noteData?.painLevel != null ? PAIN_LEVELS[noteData.painLevel] : null
 
   return (
     <motion.div
@@ -77,8 +218,24 @@ function HistoryCard({ entry, index, onSelect, onDelete, onCompare, isCompareBas
                   Compare A
                 </span>
               )}
+              {noteData?.painLevel != null && noteData.painLevel > 0 && painData && (
+                <span className="text-[10px] px-1.5 py-0.5 rounded-full font-semibold" style={{ color: painData.color, background: `${painData.color}15` }}>
+                  Pain: {painData.label}
+                </span>
+              )}
             </div>
             <div className="flex items-center gap-1 flex-shrink-0">
+              <button
+                onClick={() => onNoteClick(entry)}
+                title="Add session note"
+                className={`p-1.5 rounded-lg transition-all duration-150 ${
+                  noteData?.note || noteData?.tags?.length > 0
+                    ? 'text-accent-primary bg-accent-primary/10'
+                    : 'text-text-muted hover:text-accent-primary hover:bg-accent-glow'
+                }`}
+              >
+                <StickyNote size={13} aria-hidden />
+              </button>
               <button
                 onClick={() => onCompare(entry)}
                 title="Set as comparison baseline"
@@ -97,12 +254,31 @@ function HistoryCard({ entry, index, onSelect, onDelete, onCompare, isCompareBas
           </div>
 
           {/* Score pips */}
-          <div className="flex gap-4 mb-3">
+          <div className="flex gap-4 mb-2">
             <ScorePip value={entry.scores?.overall ?? 0}              label="Overall" />
             <ScorePip value={entry.scores?.knee_valgus_left ?? 0}     label="L.Knee"  />
             <ScorePip value={entry.scores?.knee_valgus_right ?? 0}    label="R.Knee"  />
             <ScorePip value={entry.scores?.trunk_lean ?? 0}           label="Trunk"   />
           </div>
+
+          {/* Tags */}
+          {noteData?.tags?.length > 0 && (
+            <div className="flex flex-wrap gap-1 mb-2">
+              {noteData.tags.slice(0, 4).map((tag) => (
+                <span key={tag} className="text-[10px] px-1.5 py-0.5 rounded-full bg-accent-primary/8 text-accent-primary border border-accent-primary/20 font-medium">
+                  #{tag}
+                </span>
+              ))}
+              {noteData.tags.length > 4 && (
+                <span className="text-[10px] text-text-muted">+{noteData.tags.length - 4}</span>
+              )}
+            </div>
+          )}
+
+          {/* Note preview */}
+          {noteData?.note && (
+            <p className="text-xs text-text-muted mb-2 italic line-clamp-1">"{noteData.note}"</p>
+          )}
 
           <div className="flex items-center justify-between">
             <span className="text-xs text-text-muted flex items-center gap-1">
@@ -131,23 +307,33 @@ export default function HistoryScreen() {
   const clearHistory  = useStore((s) => s.clearHistory)
   const setScreen     = useStore((s) => s.setScreen)
   const setResults    = useStore((s) => s.setResults)
+  const sessionNotes  = useStore((s) => s.sessionNotes)
+  const updateSessionNote = useStore((s) => s.updateSessionNote)
 
-  const [filter, setFilter] = useState('All')
+  const [filter, setFilter]       = useState('All')
   const [confirmClear, setConfirmClear] = useState(false)
+  const [noteEntry, setNoteEntry] = useState(null)
+  const [search, setSearch]       = useState('')
+  const [riskFilter, setRiskFilter] = useState('All')
 
   const movements = ['All', ...new Set(history.map((h) => h.movement_type))]
 
-  const filtered = filter === 'All'
-    ? history
-    : history.filter((h) => h.movement_type === filter)
+  const filtered = useMemo(() => {
+    return history.filter((h) => {
+      const matchMove = filter === 'All' || h.movement_type === filter
+      const matchRisk = riskFilter === 'All' || h.ai_coaching?.overall_risk_level === riskFilter
+      const matchSearch = !search || h.movement_type.toLowerCase().includes(search.toLowerCase()) ||
+        sessionNotes[h.id]?.note?.toLowerCase().includes(search.toLowerCase()) ||
+        sessionNotes[h.id]?.tags?.some((t) => t.toLowerCase().includes(search.toLowerCase()))
+      return matchMove && matchRisk && matchSearch
+    })
+  }, [history, filter, riskFilter, search, sessionNotes])
 
   const handleSelect = (entry) => {
     if (compareData && compareData.id !== entry.id) {
       setCompareData({ ...compareData, second: entry })
       setScreen('comparison')
     } else {
-      // Load the history entry into the results screen.
-      // analysis_id must match entry.id so _saveToHistory deduplicates correctly.
       setResults({ ...entry, analysis_id: entry.id })
     }
   }
@@ -160,11 +346,18 @@ export default function HistoryScreen() {
     }
   }
 
+  function handleSaveNote(noteData) {
+    if (noteEntry) {
+      updateSessionNote(noteEntry.id, noteData)
+      setNoteEntry(null)
+    }
+  }
+
   return (
     <div className="min-h-screen mesh-bg pb-20">
       <div className="max-w-4xl mx-auto px-4 pt-8">
         {/* Header */}
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center justify-between mb-4">
           <div>
             <h1 className="text-2xl font-bold text-text-primary">Analysis History</h1>
             <p className="text-sm text-text-secondary mt-0.5">
@@ -210,6 +403,29 @@ export default function HistoryScreen() {
           </div>
         </div>
 
+        {/* Search + filters */}
+        {history.length > 0 && (
+          <div className="flex flex-col sm:flex-row gap-2 mb-4">
+            <div className="relative flex-1">
+              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
+              <input
+                type="text"
+                placeholder="Search notes or tags..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="w-full pl-8 pr-3 py-2 rounded-xl border border-border-subtle bg-bg-base text-sm text-text-primary focus:outline-none focus:border-accent-primary"
+              />
+            </div>
+            <select
+              value={riskFilter}
+              onChange={(e) => setRiskFilter(e.target.value)}
+              className="px-3 py-2 rounded-xl border border-border-subtle bg-bg-base text-sm text-text-primary focus:outline-none focus:border-accent-primary"
+            >
+              {['All', 'Low', 'Moderate', 'High'].map((r) => <option key={r}>{r}</option>)}
+            </select>
+          </div>
+        )}
+
         {/* Compare banner */}
         <AnimatePresence>
           {compareData && !compareData.second && (
@@ -222,16 +438,14 @@ export default function HistoryScreen() {
               <p className="text-sm text-accent-primary">
                 <span className="font-semibold">Compare mode:</span> Select a second analysis to compare with {compareData.movement_type}
               </p>
-              <button onClick={() => setCompareData(null)} className="text-xs text-text-muted hover:text-text-primary">
-                Cancel
-              </button>
+              <button onClick={() => setCompareData(null)} className="text-xs text-text-muted hover:text-text-primary">Cancel</button>
             </motion.div>
           )}
         </AnimatePresence>
 
         {/* Movement filter pills */}
         {movements.length > 2 && (
-          <div className="flex gap-2 overflow-x-auto pb-2 mb-4">
+          <div className="flex gap-2 overflow-x-auto pb-2 mb-4" style={{ scrollbarWidth: 'none' }}>
             {movements.map((m) => (
               <button
                 key={m}
@@ -254,16 +468,22 @@ export default function HistoryScreen() {
             <div className="w-16 h-16 rounded-2xl bg-accent-glow flex items-center justify-center mb-4">
               <Dumbbell size={28} className="text-accent-secondary" aria-hidden />
             </div>
-            <h2 className="text-lg font-semibold text-text-primary mb-2">No analyses yet</h2>
+            <h2 className="text-lg font-semibold text-text-primary mb-2">
+              {history.length === 0 ? 'No analyses yet' : 'No matches found'}
+            </h2>
             <p className="text-sm text-text-secondary mb-6 max-w-xs">
-              Upload a video to get your first movement analysis. Results are automatically saved here.
+              {history.length === 0
+                ? 'Upload a video to get your first movement analysis. Results are automatically saved here.'
+                : 'Try adjusting your filters or search term.'}
             </p>
-            <button
-              onClick={() => setScreen('upload')}
-              className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-accent-primary to-accent-secondary text-white text-sm font-semibold hover:brightness-110 transition-all"
-            >
-              Start Analyzing <ArrowRight size={14} aria-hidden />
-            </button>
+            {history.length === 0 && (
+              <button
+                onClick={() => setScreen('upload')}
+                className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-accent-primary to-accent-secondary text-white text-sm font-semibold hover:brightness-110 transition-all"
+              >
+                Start Analyzing <ArrowRight size={14} aria-hidden />
+              </button>
+            )}
           </div>
         )}
 
@@ -279,11 +499,25 @@ export default function HistoryScreen() {
                 onDelete={removeFromHistory}
                 onCompare={handleCompare}
                 isCompareBase={compareData?.id === entry.id}
+                noteData={sessionNotes[entry.id]}
+                onNoteClick={setNoteEntry}
               />
             ))}
           </div>
         </AnimatePresence>
       </div>
+
+      {/* Note modal */}
+      <AnimatePresence>
+        {noteEntry && (
+          <NoteModal
+            entry={noteEntry}
+            noteData={sessionNotes[noteEntry.id]}
+            onSave={handleSaveNote}
+            onClose={() => setNoteEntry(null)}
+          />
+        )}
+      </AnimatePresence>
     </div>
   )
 }
