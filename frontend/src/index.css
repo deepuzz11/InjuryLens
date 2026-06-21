@@ -406,7 +406,8 @@
   font-weight: 500;
   color: #64748b;
   transition: all 0.18s ease;
-  cursor: pointer;`n  width: 100%;
+  cursor: pointer;
+  width: 100%;
   white-space: nowrap;
   overflow: hidden;
 }
