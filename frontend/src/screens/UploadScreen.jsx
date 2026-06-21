@@ -573,60 +573,6 @@ export default function UploadScreen() {
         </div>
       </section>
 
-      {/* ── How It Works ────────────────────────────────────────────────── */}
-      <section id="how-it-works" className="px-4 py-20">
-        <div className="max-w-4xl mx-auto">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            className="text-center mb-12"
-          >
-            <h2 className="text-3xl font-bold text-text-primary mb-3">How InjuryLens Works</h2>
-            <p className="text-text-secondary">Clinical-grade biomechanics analysis in three steps</p>
-          </motion.div>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
-            <HowItWorksCard step={1} icon={Upload}    title="Upload or Record"           desc="Upload an MP4/MOV/AVI file or record directly with your webcam. Ensure your full body is visible with good lighting." delay={0} />
-            <HowItWorksCard step={2} icon={Brain}     title="AI Analyzes Your Movement"  desc="Our engine tracks 33 body landmarks per frame, measures 6 risk metrics, counts reps, and detects fatigue-driven form degradation." delay={0.1} />
-            <HowItWorksCard step={3} icon={BarChart3} title="Get Your Full Report"       desc="A personalised AI coaching plan is generated with movement cues, 5 corrective exercises, a warm-up routine, and a weekly training plan." delay={0.2} />
-          </div>
-        </div>
-      </section>
-
-      {/* ── What You Get ────────────────────────────────────────────────── */}
-      <section className="px-4 pb-20">
-        <div className="max-w-4xl mx-auto">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            className="text-center mb-10"
-          >
-            <h2 className="text-2xl font-bold text-text-primary mb-2">What You Get</h2>
-            <p className="text-sm text-text-secondary">Everything you need to move smarter and recover faster</p>
-          </motion.div>
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-            {FEATURE_CARDS.map(({ icon: Icon, title, desc }, i) => (
-              <motion.div
-                key={title}
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ delay: i * 0.07, duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
-                whileHover={{ y: -3, transition: { duration: 0.2 } }}
-                className="glass rounded-2xl p-5 border border-border-subtle hover:border-accent-primary/20 transition-colors duration-200 group"
-              >
-                <div className="w-9 h-9 rounded-xl bg-accent-glow flex items-center justify-center mb-3 group-hover:bg-accent-primary/20 transition-colors duration-200">
-                  <Icon size={17} className="text-accent-primary" aria-hidden />
-                </div>
-                <p className="text-sm font-semibold text-text-primary mb-1">{title}</p>
-                <p className="text-xs text-text-secondary leading-relaxed">{desc}</p>
-              </motion.div>
-            ))}
-          </div>
-        </div>
-      </section>
-
       {/* ── Footer ──────────────────────────────────────────────────────── */}
       <footer className="relative border-t border-border-subtle py-8 px-4 text-center text-xs text-text-muted overflow-hidden">
         {/* Subtle gradient line above footer */}

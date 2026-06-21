@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { motion, AnimatePresence, useInView } from 'framer-motion'
+import { Upload, Brain, BarChart3, Target, Activity, TrendingUp, Layers } from 'lucide-react'
 import AuthScreen from './AuthScreen'
 import { useStore } from '../store'
 
@@ -296,21 +297,70 @@ export default function LandingScreen({ onGetStarted, onSignIn }) {
       </section>
 
       {/* ── HOW IT WORKS ──────────────────────────────────────────────── */}
-      <section className="py-20 px-6 bg-bg-surface">
+      <section className="py-20 px-6" style={{ background: 'rgba(79,70,229,0.025)' }}>
         <div className="max-w-5xl mx-auto">
-          <motion.h2 initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}
-            className="text-3xl md:text-4xl font-extrabold text-text-primary text-center mb-14">
-            How it works
-          </motion.h2>
+          <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}
+            className="text-center mb-14">
+            <p className="text-xs font-bold uppercase tracking-widest text-accent-primary mb-3">The Process</p>
+            <h2 className="text-3xl md:text-4xl font-extrabold text-text-primary mb-3">How InjuryLens Works</h2>
+            <p className="text-text-secondary">Clinical-grade biomechanics analysis in three steps</p>
+          </motion.div>
           <div className="grid md:grid-cols-3 gap-6">
-            {STEPS.map((step, i) => (
-              <motion.div key={step.n}
+            {[
+              { step: 1, icon: Upload,    title: 'Upload or Record',          desc: 'Upload an MP4/MOV/AVI file or record directly with your webcam. Ensure your full body is visible with good lighting.' },
+              { step: 2, icon: Brain,     title: 'AI Analyzes Your Movement', desc: 'Our engine tracks 33 body landmarks per frame, measures 6 risk metrics, counts reps, and detects fatigue-driven form degradation.' },
+              { step: 3, icon: BarChart3, title: 'Get Your Full Report',      desc: 'A personalised AI coaching plan is generated with movement cues, 5 corrective exercises, a warm-up routine, and a weekly training plan.' },
+            ].map(({ step, icon: Icon, title, desc }, i) => (
+              <motion.div key={step}
                 initial={{ opacity: 0, y: 24 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}
-                transition={{ delay: i * 0.12 }}
-                className="relative flex flex-col items-start p-7 rounded-2xl glass border border-border-subtle shadow-sm">
-                <span className="text-5xl font-black mb-4 leading-none gradient-text opacity-30">{step.n}</span>
-                <h3 className="font-bold text-text-primary text-lg mb-2">{step.title}</h3>
-                <p className="text-sm text-text-secondary">{step.desc}</p>
+                transition={{ delay: i * 0.12, duration: 0.55, ease: [0.16, 1, 0.3, 1] }}
+                className="glass rounded-2xl p-6 flex flex-col gap-4 card-hover border border-border-subtle hover:border-accent-primary/25">
+                <div className="flex items-center gap-3">
+                  <span className="w-7 h-7 rounded-full bg-accent-primary/15 text-accent-primary text-xs font-bold flex items-center justify-center border border-accent-primary/25">
+                    {step}
+                  </span>
+                  <div className="w-10 h-10 rounded-xl bg-accent-primary/8 flex items-center justify-center border border-accent-primary/10">
+                    <Icon size={20} className="text-accent-primary" />
+                  </div>
+                </div>
+                <div>
+                  <h3 className="font-bold text-text-primary text-base mb-1.5">{title}</h3>
+                  <p className="text-sm text-text-secondary leading-relaxed">{desc}</p>
+                </div>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── WHAT YOU GET ──────────────────────────────────────────────── */}
+      <section className="py-20 px-6">
+        <div className="max-w-5xl mx-auto">
+          <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}
+            className="text-center mb-12">
+            <p className="text-xs font-bold uppercase tracking-widest text-accent-primary mb-3">Capabilities</p>
+            <h2 className="text-3xl md:text-4xl font-extrabold text-text-primary mb-3">What You Get</h2>
+            <p className="text-text-secondary">Everything you need to move smarter and recover faster</p>
+          </motion.div>
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+            {[
+              { icon: Target,     title: '6 Risk Metrics',     desc: 'Knee valgus, trunk lean, asymmetry, shoulder & hip measurements' },
+              { icon: Activity,   title: 'Rep Counter',         desc: 'Automatically detects and counts repetitions from your video' },
+              { icon: TrendingUp, title: 'Fatigue Detection',   desc: 'Compares form quality across first vs. second half of session' },
+              { icon: Brain,      title: 'AI Coaching Report',  desc: '5 exercises, warm-up routine, and a 5-day personalised plan' },
+              { icon: BarChart3,  title: 'Angle Timeline',      desc: 'Frame-by-frame joint angle chart to spot form fluctuations' },
+              { icon: Layers,     title: 'Progress Tracking',   desc: 'Save analyses and track your improvement over time' },
+            ].map(({ icon: Icon, title, desc }, i) => (
+              <motion.div key={title}
+                initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}
+                transition={{ delay: i * 0.07, duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+                whileHover={{ y: -3, transition: { duration: 0.2 } }}
+                className="glass rounded-2xl p-5 border border-border-subtle hover:border-accent-primary/20 transition-colors duration-200 group">
+                <div className="w-9 h-9 rounded-xl bg-accent-primary/8 flex items-center justify-center mb-3 group-hover:bg-accent-primary/15 transition-colors duration-200">
+                  <Icon size={17} className="text-accent-primary" />
+                </div>
+                <p className="text-sm font-semibold text-text-primary mb-1">{title}</p>
+                <p className="text-xs text-text-secondary leading-relaxed">{desc}</p>
               </motion.div>
             ))}
           </div>
