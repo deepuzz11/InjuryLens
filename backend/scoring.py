@@ -1,6 +1,8 @@
 import math
 import logging
 
+from biomechanics import _MOVEMENT_PROFILES, _DEFAULT_PROFILE
+
 logger = logging.getLogger("injurylens.scoring")
 
 
@@ -132,7 +134,7 @@ class RiskScorer:
         if trunk_rot > 5.0:
             base += 5.0
 
-        probability = max(2.0, min(85.0, round(base, 1)))
+        probability = max(0.0, min(85.0, round(base, 1)))
         logger.info(f"Injury probability: {probability}%")
         return probability
 
@@ -168,7 +170,6 @@ class RiskScorer:
         Generate per-metric explainability: how many frames exceeded threshold
         and the worst measured deviation from safe range.
         """
-        from biomechanics import _MOVEMENT_PROFILES, _DEFAULT_PROFILE
         profile = _MOVEMENT_PROFILES.get(movement_type, _DEFAULT_PROFILE)
         n = len(frame_flags)
         if n == 0:

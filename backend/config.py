@@ -1,6 +1,7 @@
 import pathlib
 import secrets
 import logging
+from typing import List
 from pydantic_settings import BaseSettings
 from pydantic import field_validator
 
@@ -15,10 +16,14 @@ class Settings(BaseSettings):
     APP_NAME: str = "InjuryLens"
     VERSION: str = "1.0.0"
     MAX_VIDEO_SIZE_MB: int = 100
+    MAX_ANALYSIS_FRAMES: int = 300   # cap frames sent to MediaPipe (prevents OOM on long videos)
     MIN_VALID_FRAMES: int = 10
     POSE_DETECTION_CONFIDENCE: float = 0.6
     POSE_TRACKING_CONFIDENCE: float = 0.6
     MIN_LANDMARK_VISIBILITY: float = 0.5
+
+    # CORS — override in production: ALLOWED_ORIGINS='["https://yourapp.com"]'
+    ALLOWED_ORIGINS: List[str] = ["http://localhost:5173", "http://localhost:3000"]
 
     # ── Database — set DB_TYPE="mongodb" + MONGODB_URL to switch backends ───
     DB_TYPE: str = "sqlite"                          # "sqlite" | "mongodb"
@@ -65,7 +70,7 @@ class Settings(BaseSettings):
         )
         return random_key
 
-    @field_validator("MAX_VIDEO_SIZE_MB", "MIN_VALID_FRAMES")
+    @field_validator("MAX_VIDEO_SIZE_MB", "MIN_VALID_FRAMES", "MAX_ANALYSIS_FRAMES")
     @classmethod
     def must_be_positive(cls, v: int) -> int:
         if v <= 0:

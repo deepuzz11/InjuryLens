@@ -11,11 +11,12 @@ class PoseExtractor:
     """Extracts MediaPipe Pose landmarks from every valid frame in a video."""
 
     def __init__(self) -> None:
-        self._mp_pose = mp.solutions.pose
+        self._mp_pose        = mp.solutions.pose
         self._detection_conf = settings.POSE_DETECTION_CONFIDENCE
-        self._tracking_conf = settings.POSE_TRACKING_CONFIDENCE
+        self._tracking_conf  = settings.POSE_TRACKING_CONFIDENCE
         self._min_visibility = settings.MIN_LANDMARK_VISIBILITY
-        self._min_frames = settings.MIN_VALID_FRAMES
+        self._min_frames     = settings.MIN_VALID_FRAMES
+        self._max_frames     = settings.MAX_ANALYSIS_FRAMES
 
     def extract(self, video_path: str) -> tuple[list[list[dict]], dict]:
         """
@@ -42,6 +43,11 @@ class PoseExtractor:
         height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
         duration_seconds = total_frames / fps if fps > 0 else 0.0
 
+        # Subsample frames for very long videos to keep analysis fast and memory-bounded
+        skip = max(1, total_frames // self._max_frames) if total_frames > self._max_frames else 1
+        if skip > 1:
+            logger.info(f"Long video ({total_frames} frames) — processing every {skip}th frame")
+
         valid_frames: list[list[dict]] = []
         valid_frame_indices: list[int] = []
         frame_num = 0
@@ -57,6 +63,10 @@ class PoseExtractor:
                     ret, frame = cap.read()
                     if not ret:
                         break
+
+                    if frame_num % skip != 0:
+                        frame_num += 1
+                        continue
 
                     rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
                     result = pose.process(rgb)

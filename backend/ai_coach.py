@@ -1,6 +1,7 @@
-import copy
+import asyncio
 import json
 import logging
+import re
 import traceback
 
 import google.generativeai as genai
@@ -8,6 +9,16 @@ import google.generativeai as genai
 from config import settings
 
 logger = logging.getLogger("injurylens.ai_coach")
+
+_FENCE_RE = re.compile(r"```(?:json)?\s*([\s\S]*?)```", re.IGNORECASE)
+
+
+def _extract_json(raw: str) -> str:
+    """Return the JSON string from a response that may be wrapped in a markdown fence."""
+    m = _FENCE_RE.search(raw)
+    if m:
+        return m.group(1).strip()
+    return raw.strip()
 
 
 class AICoach:
@@ -29,7 +40,7 @@ class AICoach:
             self._model = None
             logger.warning("AICoach: GEMINI_API_KEY not set — fallback coaching active")
 
-    def generate(
+    async def generate(
         self,
         scores: dict,
         avg_stats: dict,
@@ -41,19 +52,9 @@ class AICoach:
 
         try:
             prompt = self._build_prompt(scores, avg_stats, movement_type, athlete_context)
-            response = self._model.generate_content(prompt)
-            raw = response.text.strip()
-
-            if raw.startswith("```"):
-                parts = raw.split("```")
-                raw = parts[1] if len(parts) > 1 else raw
-                if raw.startswith("json"):
-                    raw = raw[4:]
-                raw = raw.strip()
-            if raw.endswith("```"):
-                raw = raw[:-3].strip()
-
-            coaching = json.loads(raw)
+            response = await asyncio.to_thread(self._model.generate_content, prompt)
+            raw      = response.text.strip()
+            coaching = json.loads(_extract_json(raw))
 
             fallback = self._fallback(scores, movement_type, athlete_context)
             required_keys = [

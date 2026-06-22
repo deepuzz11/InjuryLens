@@ -104,11 +104,72 @@ class FrameAnnotator:
         scores: dict,
         risk_level: str,
     ) -> dict:
-        return {
-            "worst":  self.annotate(video_path, worst_idx,  scores, risk_level, "Worst Frame"),
-            "best":   self.annotate(video_path, best_idx,   scores, risk_level, "Best Frame"),
-            "middle": self.annotate(video_path, middle_idx, scores, risk_level, "Middle Frame"),
-        }
+        """Annotate three frames opening the video and running MediaPipe only once."""
+        targets = [
+            ("worst",  worst_idx,  "Worst Frame"),
+            ("best",   best_idx,   "Best Frame"),
+            ("middle", middle_idx, "Middle Frame"),
+        ]
+
+        # Single video open — seek to each target frame
+        cap = cv2.VideoCapture(video_path)
+        raw: dict[str, object] = {}
+        try:
+            for key, idx, _ in targets:
+                cap.set(cv2.CAP_PROP_POS_FRAMES, idx)
+                ret, frame = cap.read()
+                if not ret:
+                    logger.warning(f"Could not seek to frame {idx}, falling back to frame 0")
+                    cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+                    ret, frame = cap.read()
+                    if not ret:
+                        raise ValueError("Could not read any frame from the video.")
+                raw[key] = frame
+        finally:
+            cap.release()
+
+        # Single MediaPipe session for all three frames
+        result: dict[str, str] = {}
+        with self._mp_pose.Pose(
+            static_image_mode=True,
+            model_complexity=1,
+            min_detection_confidence=settings.POSE_DETECTION_CONFIDENCE,
+        ) as pose:
+            for key, _, label in targets:
+                frame = raw[key].copy()
+                rgb   = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                pr    = pose.process(rgb)
+
+                if pr.pose_landmarks:
+                    self._mp_drawing.draw_landmarks(
+                        frame, pr.pose_landmarks,
+                        self._mp_pose.POSE_CONNECTIONS,
+                        landmark_drawing_spec=self._mp_drawing.DrawingSpec(
+                            color=_INDIGO_BGR, thickness=2, circle_radius=4),
+                        connection_drawing_spec=self._mp_drawing.DrawingSpec(
+                            color=_WHITE_BGR, thickness=2, circle_radius=2),
+                    )
+                    self._draw_angle_labels(frame, pr.pose_landmarks, frame.shape)
+                else:
+                    logger.warning(f"No pose detected on '{key}' frame")
+
+                h, w = frame.shape[:2]
+                if w > 800:
+                    scale = 800 / w
+                    frame = cv2.resize(frame, (800, int(h * scale)))
+                    h, w  = frame.shape[:2]
+
+                frame = self._draw_score_overlay(frame, scores, w, h)
+                frame = self._draw_risk_badge(frame, scores["overall"], risk_level, w)
+                self._draw_frame_label(frame, label, w, h)
+                frame = self._draw_watermark(frame, w, h)
+
+                success, buf = cv2.imencode(".png", frame, [cv2.IMWRITE_PNG_COMPRESSION, 1])
+                if not success:
+                    raise RuntimeError(f"Failed to encode '{key}' frame as PNG.")
+                result[key] = base64.b64encode(buf.tobytes()).decode("utf-8")
+
+        return result
 
     def _draw_angle_labels(self, frame, pose_landmarks, shape) -> None:
         h, w = shape[:2]

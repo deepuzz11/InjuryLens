@@ -1,7 +1,16 @@
-// Empty base so every request goes through Vite's dev proxy (/analyze → localhost:8001).
+// Empty base so every request goes through Vite's dev proxy (/analyze → localhost:8000).
 // In production, deploy the frontend on the same origin as the API or set VITE_API_URL.
 const API_BASE = import.meta.env.VITE_API_URL ?? ''
 const TIMEOUT_MS = 90_000
+
+function _getToken() {
+  try {
+    const stored = JSON.parse(localStorage.getItem('injurylens-v6') || '{}')
+    return stored.state?.authToken ?? null
+  } catch {
+    return null
+  }
+}
 
 function getSuggestion(status) {
   if (status === 413) return 'The file exceeds the 100 MB limit. Compress your video or trim it to under 60 seconds.'
@@ -33,8 +42,11 @@ async function _fetchWithTimeout(url, options = {}) {
  * POST /analyze — upload video for biomechanical analysis.
  */
 export async function analyzeVideo(formData) {
+  const token = _getToken()
+  const headers = token ? { Authorization: `Bearer ${token}` } : {}
   const response = await _fetchWithTimeout(`${API_BASE}/analyze`, {
     method: 'POST',
+    headers,
     body: formData,
   })
   if (!response.ok) {

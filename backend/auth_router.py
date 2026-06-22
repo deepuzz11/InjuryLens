@@ -6,7 +6,7 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
 import bcrypt as _bcrypt
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 from jose import JWTError, jwt
@@ -18,6 +18,7 @@ from auth_schemas import (
     ResetPasswordRequest, TokenResponse, UserOut, MessageResponse,
 )
 from config import settings
+from limiter import limiter
 
 logger   = logging.getLogger(__name__)
 router   = APIRouter(prefix="/auth", tags=["auth"])
@@ -89,7 +90,8 @@ def _create_token(data: dict) -> str:
 # ── Endpoints ─────────────────────────────────────────────────────────────────
 
 @router.post("/register", response_model=TokenResponse, status_code=201)
-def register(body: UserCreate, db: Session = Depends(get_db)):
+@limiter.limit("10/minute")
+def register(request: Request, body: UserCreate, db: Session = Depends(get_db)):
     if db.query(User).filter(User.email == body.email).first():
         raise HTTPException(status_code=409, detail="Email already registered.")
     user = User(
@@ -105,7 +107,8 @@ def register(body: UserCreate, db: Session = Depends(get_db)):
 
 
 @router.post("/login", response_model=TokenResponse)
-def login(body: UserLogin, db: Session = Depends(get_db)):
+@limiter.limit("20/minute")
+def login(request: Request, body: UserLogin, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.email == body.email).first()
     if not user or not _verify(body.password, user.hashed_password):
         raise HTTPException(status_code=401, detail="Invalid email or password.")
@@ -116,7 +119,8 @@ def login(body: UserLogin, db: Session = Depends(get_db)):
 
 
 @router.post("/forgot-password", response_model=MessageResponse)
-def forgot_password(body: ForgotPasswordRequest, db: Session = Depends(get_db)):
+@limiter.limit("5/minute")
+def forgot_password(request: Request, body: ForgotPasswordRequest, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.email == body.email).first()
     if user:
         token = secrets.token_urlsafe(32)
@@ -129,13 +133,20 @@ def forgot_password(body: ForgotPasswordRequest, db: Session = Depends(get_db)):
 
 
 @router.post("/reset-password", response_model=MessageResponse)
-def reset_password(body: ResetPasswordRequest, db: Session = Depends(get_db)):
+@limiter.limit("5/minute")
+def reset_password(request: Request, body: ResetPasswordRequest, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.reset_token == body.token).first()
     if not user or not user.reset_token_expires:
         raise HTTPException(status_code=400, detail="Invalid or expired reset token.")
-    if datetime.now(timezone.utc) > user.reset_token_expires.replace(tzinfo=timezone.utc):
+    # Normalise to UTC regardless of whether the DB stored tz-aware or naive datetime
+    expires = user.reset_token_expires
+    if expires.tzinfo is None:
+        expires = expires.replace(tzinfo=timezone.utc)
+    else:
+        expires = expires.astimezone(timezone.utc)
+    if datetime.now(timezone.utc) > expires:
         raise HTTPException(status_code=400, detail="Reset token has expired.")
-    user.hashed_password    = _hash(body.new_password)
+    user.hashed_password     = _hash(body.new_password)
     user.reset_token         = None
     user.reset_token_expires = None
     db.commit()
@@ -153,6 +164,8 @@ def get_me(
         user    = db.query(User).filter(User.email == email).first()
         if not user:
             raise HTTPException(status_code=404, detail="User not found.")
+        if not user.is_active:
+            raise HTTPException(status_code=403, detail="Account deactivated.")
         return UserOut.model_validate(user)
     except JWTError:
         raise HTTPException(status_code=401, detail="Invalid token.")

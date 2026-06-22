@@ -1,17 +1,27 @@
+import asyncio
 import os
+import re
 import time
 import uuid
 import logging
 import tempfile
 import traceback
+from contextlib import asynccontextmanager
 from pathlib import Path
+from typing import Annotated
 
 import mediapipe as mp
-from fastapi import FastAPI, File, Form, UploadFile, HTTPException
+from fastapi import Depends, FastAPI, File, Form, UploadFile, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from jose import JWTError, jwt
+from jose.exceptions import ExpiredSignatureError
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
 from starlette.middleware.base import BaseHTTPMiddleware
-from starlette.requests import Request
+
+from limiter import limiter
 
 from config import settings
 from database import init_db
@@ -46,17 +56,29 @@ logger = logging.getLogger("injurylens")
 
 START_TIME = time.time()
 
-pose_extractor   = PoseExtractor()
+pose_extractor      = PoseExtractor()
 biomechanics_engine = BiomechanicsEngine()
-risk_scorer      = RiskScorer()
-ai_coach         = AICoach()
-frame_annotator  = FrameAnnotator()
+risk_scorer         = RiskScorer()
+ai_coach            = AICoach()
+frame_annotator     = FrameAnnotator()
+
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    init_db()
+    _seed_demo_user()
+    logger.info("Database initialised.")
+    yield
+
 
 app = FastAPI(
     title=settings.APP_NAME,
     version=settings.VERSION,
     description="AI-powered sports movement analysis and injury risk assessment.",
+    lifespan=lifespan,
 )
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 
 @app.exception_handler(Exception)
@@ -77,19 +99,37 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
 app.add_middleware(RequestLoggingMiddleware)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=settings.ALLOWED_ORIGINS,
+    allow_credentials=False,   # tokens live in localStorage, not cookies
+    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type"],
 )
 
 app.include_router(auth_router)
 
-@app.on_event("startup")
-def on_startup():
-    init_db()
-    _seed_demo_user()
-    logger.info("Database initialised.")
+# ─── Optional auth dependency ────────────────────────────────────────────────
+# Reads the Bearer token when present and resolves the caller's email.
+# Requests without a token (or with an invalid token) are allowed through so
+# that the demo-user flow and unauthenticated clients continue to work.
+_optional_bearer = HTTPBearer(auto_error=False)
+
+def _get_optional_user(
+    creds: HTTPAuthorizationCredentials | None = Depends(_optional_bearer),
+) -> str | None:
+    if not creds:
+        return None
+    try:
+        payload = jwt.decode(
+            creds.credentials, settings.SECRET_KEY, algorithms=[settings.ALGORITHM]
+        )
+        return payload.get("sub")
+    except ExpiredSignatureError:
+        logger.info("Expired JWT presented — treating request as anonymous")
+        return None
+    except JWTError:
+        logger.debug("Invalid JWT presented — treating request as anonymous")
+        return None
+
 
 def _seed_demo_user():
     """Ensure a demo account exists so users can try the app without registering."""
@@ -102,17 +142,43 @@ def _seed_demo_user():
         if not existing:
             hashed = _bcrypt.hashpw(b"demo1234", _bcrypt.gensalt()).decode()
             db.add(User(
-                name="Demo Athlete",
+                name="Alex Rivera",
                 email="demo@injurylens.com",
                 hashed_password=hashed,
             ))
             db.commit()
-            logger.info("Demo user created: demo@injurylens.com / demo1234")
+            logger.info("Demo user seeded: demo@injurylens.com")
     finally:
         db.close()
 
 ALLOWED_EXTENSIONS = {".mp4", ".mov", ".avi", ".webm"}
 ALLOWED_MIME_TYPES = {"video/mp4", "video/quicktime", "video/x-msvideo", "video/avi", "video/webm"}
+
+# Magic-byte signatures keyed by extension (checked against the first 12 bytes)
+_MAGIC: dict[str, callable] = {
+    ".mp4":  lambda h: h[4:8] in (b"ftyp", b"moov", b"mdat", b"free"),
+    ".mov":  lambda h: h[4:8] in (b"ftyp", b"moov", b"mdat", b"free", b"wide"),
+    ".avi":  lambda h: h[:4] == b"RIFF",
+    ".webm": lambda h: h[:4] == b"\x1a\x45\xdf\xa3",
+}
+
+_SAFE_FIELD_RE = re.compile(r"[^\w\s\-–—/(),.'\"]+", re.UNICODE)
+_MAX_FIELD_LEN = 100
+
+
+def _sanitize_form_field(value: str) -> str:
+    """Strip control chars and limit length for fields embedded in the AI prompt."""
+    value = value.strip()[:_MAX_FIELD_LEN]
+    return _SAFE_FIELD_RE.sub("", value)
+
+
+def _validate_magic_bytes(header: bytes, ext: str) -> None:
+    check = _MAGIC.get(ext)
+    if check and not check(header):
+        raise HTTPException(
+            status_code=422,
+            detail="File content does not match the declared video format. Please re-export as a standard video file.",
+        )
 
 SUPPORTED_MOVEMENTS = [
     MovementInfo(id="Squat",          label="Squat",           category="Lower Body",  description="Bilateral lower body strength assessment.", key_metrics=["knee valgus", "trunk lean", "depth", "asymmetry"], difficulty="Beginner"),
@@ -278,7 +344,8 @@ def _build_response(
 # ─── Endpoints ──────────────────────────────────────────────────────────────
 
 @app.get("/health")
-async def health_check():
+@limiter.limit("30/minute")
+async def health_check(request: Request):
     return {
         "status": "ok",
         "app_name": settings.APP_NAME,
@@ -306,18 +373,29 @@ async def list_movements():
         500: {"model": ErrorResponse, "description": "Internal server error"},
     },
 )
+@limiter.limit("10/minute")
 async def analyze_video(
+    request: Request,
     file: UploadFile = File(...),
-    movement_type: str = Form(default="Squat"),
-    fitness_level: str = Form(default="Intermediate"),
-    age_group: str = Form(default="25–34"),
-    goal: str = Form(default="Injury Prevention"),
-    sport: str = Form(default=""),
+    movement_type: Annotated[str, Form(max_length=50)] = "Squat",
+    fitness_level: Annotated[str, Form(max_length=50)] = "Intermediate",
+    age_group: Annotated[str, Form(max_length=20)] = "25–34",
+    goal: Annotated[str, Form(max_length=100)] = "Injury Prevention",
+    sport: Annotated[str, Form(max_length=50)] = "",
+    current_user: str | None = Depends(_get_optional_user),
 ):
+    # Sanitize fields that will be embedded in the AI prompt
+    movement_type = _sanitize_form_field(movement_type)
+    fitness_level = _sanitize_form_field(fitness_level)
+    age_group     = _sanitize_form_field(age_group)
+    goal          = _sanitize_form_field(goal)
+    sport         = _sanitize_form_field(sport)
+
     request_start = time.time()
     logger.info(
         f"Analysis — movement: {movement_type!r}, fitness: {fitness_level!r}, "
-        f"age: {age_group!r}, goal: {goal!r}, sport: {sport!r}"
+        f"age: {age_group!r}, goal: {goal!r}, sport: {sport!r}, "
+        f"user: {current_user or 'anonymous'}"
     )
 
     file_ext = Path(file.filename or "").suffix.lower()
@@ -334,28 +412,36 @@ async def analyze_video(
     if ct and ct not in ALLOWED_MIME_TYPES:
         logger.warning(f"Unexpected content-type '{ct}' for extension '{file_ext}'")
 
-    content  = await file.read()
-    max_bytes = settings.MAX_VIDEO_SIZE_MB * 1024 * 1024
-    if len(content) > max_bytes:
-        size_mb = len(content) / 1024 / 1024
-        raise HTTPException(
-            status_code=413,
-            detail=(
-                f"File size {size_mb:.1f} MB exceeds the {settings.MAX_VIDEO_SIZE_MB} MB limit. "
-                "Please compress your video or trim it to a shorter clip."
-            ),
-        )
-
     analysis_id = uuid.uuid4().hex
     tmp_path: str | None = None
+    max_bytes = settings.MAX_VIDEO_SIZE_MB * 1024 * 1024
 
     try:
-        suffix = f"_{analysis_id}{file_ext}"
-        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
-            tmp.write(content)
-            tmp_path = tmp.name
+        # Read header first for magic-bytes validation, then stream the rest to disk
+        header = await file.read(12)
+        _validate_magic_bytes(header, file_ext)
 
-        logger.info(f"Video saved to {tmp_path} ({len(content) / 1024:.0f} KB)")
+        suffix = f"_{analysis_id}{file_ext}"
+        total_size = len(header)
+        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+            tmp_path = tmp.name
+            tmp.write(header)
+            while True:
+                chunk = await file.read(1024 * 1024)  # 1 MB chunks
+                if not chunk:
+                    break
+                total_size += len(chunk)
+                if total_size > max_bytes:
+                    raise HTTPException(
+                        status_code=413,
+                        detail=(
+                            f"File size exceeds the {settings.MAX_VIDEO_SIZE_MB} MB limit. "
+                            "Please compress your video or trim it to a shorter clip."
+                        ),
+                    )
+                tmp.write(chunk)
+
+        logger.info(f"Video saved to {tmp_path} ({total_size / 1024:.0f} KB)")
 
         # 1. Extract pose landmarks
         try:
@@ -372,7 +458,7 @@ async def analyze_video(
         scores     = risk_scorer.score(frame_flags, movement_type)
         risk_level = _risk_level_from_score(scores["overall"])
 
-        # 4. Annotate frames
+        # 4. Annotate frames (single video-open, one MediaPipe session for all three)
         worst_valid_idx  = avg_stats["worst_frame_index"]
         best_valid_idx   = avg_stats["best_frame_index"]
         middle_valid_idx = avg_stats["middle_frame_index"]
@@ -382,10 +468,10 @@ async def analyze_video(
         best_actual   = valid_indices[best_valid_idx]
         middle_actual = valid_indices[middle_valid_idx]
 
-        annotated_b64  = frame_annotator.annotate(tmp_path, worst_actual, scores, risk_level)
-        annotated_set  = frame_annotator.annotate_multiple(
+        annotated_set = frame_annotator.annotate_multiple(
             tmp_path, worst_actual, best_actual, middle_actual, scores, risk_level
         )
+        annotated_b64 = annotated_set["worst"]  # worst frame also serves as the primary annotated image
 
         # 5. AI coaching
         athlete_context = {
@@ -394,7 +480,7 @@ async def analyze_video(
             "goal":          goal,
             "sport":         sport,
         }
-        coaching = ai_coach.generate(scores, avg_stats, movement_type, athlete_context)
+        coaching = await ai_coach.generate(scores, avg_stats, movement_type, athlete_context)
 
         # 6. Movement Quality Score + Injury Probability (Features 5, 12)
         mqs_result = risk_scorer.calculate_mqs(scores)
