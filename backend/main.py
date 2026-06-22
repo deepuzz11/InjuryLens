@@ -29,6 +29,7 @@ from models import (
     FrameDataPoint,
     ErrorResponse,
     MovementInfo,
+    SportInjuryFlag,
 )
 from pose_extractor import PoseExtractor
 from biomechanics import BiomechanicsEngine
@@ -172,6 +173,8 @@ def _build_response(
     annotated_frames_dict: dict,
     frame_timeline: list,
     metadata: dict,
+    risk_breakdown: dict | None = None,
+    sport_injury_flags: list | None = None,
 ) -> AnalysisResponse:
     individual = coaching.get("individual_feedback", {})
     exercises  = [
@@ -239,6 +242,8 @@ def _build_response(
             mqs_grade=avg_stats.get("mqs_grade", "C"),
             mqs_percentile=avg_stats.get("mqs_percentile", 50),
             injury_probability_4w=avg_stats.get("injury_probability_4w", 0.0),
+            analysis_confidence=avg_stats.get("analysis_confidence", 75),
+            per_rep_quality=avg_stats.get("per_rep_quality", []),
         ),
         ai_coaching=AICoaching(
             overall_risk_level=coaching.get("overall_risk_level", "Moderate"),
@@ -263,6 +268,10 @@ def _build_response(
         annotated_frame=annotated_b64,
         annotated_frames=annotated_frames_model,
         frame_timeline=frame_timeline,
+        risk_breakdown=risk_breakdown or {},
+        sport_injury_flags=[
+            SportInjuryFlag(**f) for f in (sport_injury_flags or [])
+        ],
     )
 
 
@@ -396,14 +405,22 @@ async def analyze_video(
         avg_stats["mqs_percentile"]       = mqs_result["mqs_percentile"]
         avg_stats["injury_probability_4w"] = injury_prob
 
-        # 7. Frame timeline (downsampled for charting)
+        # 7. Analysis confidence + per-rep quality + risk breakdown + sport injury flags
+        rep_count = avg_stats.get("rep_count", 0)
+        avg_stats["analysis_confidence"] = risk_scorer.calculate_confidence(len(frames), rep_count)
+        avg_stats["per_rep_quality"]     = biomechanics_engine.get_per_rep_quality(frame_flags)
+        risk_breakdown   = risk_scorer.calculate_risk_breakdown(frame_flags, movement_type)
+        sport_inj_flags  = risk_scorer.get_sport_injury_flags(scores, sport, avg_stats)
+
+        # 8. Frame timeline (downsampled for charting)
         frame_timeline = _build_frame_timeline(frame_flags)
 
         elapsed = round(time.time() - request_start, 2)
         logger.info(
             f"Analysis {analysis_id} complete in {elapsed}s — "
             f"overall: {scores['overall']}% ({risk_level}), "
-            f"reps: {avg_stats.get('rep_count', 0)}, fatigue: {avg_stats.get('fatigue_score', 0)}%"
+            f"reps: {rep_count}, fatigue: {avg_stats.get('fatigue_score', 0)}%, "
+            f"confidence: {avg_stats['analysis_confidence']}%"
         )
 
         return _build_response(
@@ -417,6 +434,8 @@ async def analyze_video(
             annotated_frames_dict=annotated_set,
             frame_timeline=frame_timeline,
             metadata=metadata,
+            risk_breakdown=risk_breakdown,
+            sport_injury_flags=sport_inj_flags,
         )
 
     except HTTPException:

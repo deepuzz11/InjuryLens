@@ -60,6 +60,10 @@ class SupplementaryStats(BaseModel):
     mqs_percentile: int = 50
     # Feature 5: Injury probability estimate
     injury_probability_4w: float = 0.0
+    # Analysis credibility
+    analysis_confidence: int = Field(ge=0, le=100, default=75)
+    # Per-rep quality scores (0–100 each)
+    per_rep_quality: List[int] = Field(default_factory=list)
 
     @field_validator(
         "avg_left_knee_angle", "avg_right_knee_angle",
@@ -135,6 +139,20 @@ class AnnotatedFrameSet(BaseModel):
     middle: str
 
 
+class RiskBreakdownItem(BaseModel):
+    frames_exceeded_pct: int = 0
+    worst_deviation_deg: float = 0.0
+    threshold_deg: float = 0.0
+
+
+class SportInjuryFlag(BaseModel):
+    injury_name: str
+    risk_level: str  # "elevated" | "moderate" | "watch"
+    affected_metric: str
+    description: str
+    score: int = 0
+
+
 class AnalysisResponse(BaseModel):
     analysis_id: str = ""
     movement_type: str
@@ -144,6 +162,10 @@ class AnalysisResponse(BaseModel):
     annotated_frame: str
     annotated_frames: Optional[AnnotatedFrameSet] = None
     frame_timeline: List[FrameDataPoint] = Field(default_factory=list)
+    # Explainability
+    risk_breakdown: dict = Field(default_factory=dict)
+    # Sport-specific injury pattern flags
+    sport_injury_flags: List[SportInjuryFlag] = Field(default_factory=list)
 
 
 class ErrorResponse(BaseModel):

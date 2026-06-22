@@ -259,3 +259,51 @@ class BiomechanicsEngine:
             return 0
         degradation = (second_risk - first_risk) / max(first_risk, 1) * 100
         return max(0, min(100, int(degradation)))
+
+    def get_per_rep_quality(self, frame_flags: list[dict]) -> list[int]:
+        """
+        Calculate a quality score (0–100) for each detected repetition.
+        Uses the same valley-detection logic as _count_reps to find rep boundaries,
+        then scores each rep based on average frame_risk within that segment.
+        """
+        if len(frame_flags) < 10:
+            return []
+
+        angles = [(f["left_knee_angle"] + f["right_knee_angle"]) / 2 for f in frame_flags]
+        window = max(3, len(angles) // 20)
+        smoothed = []
+        for i in range(len(angles)):
+            s = max(0, i - window // 2)
+            e = min(len(angles), i + window // 2 + 1)
+            smoothed.append(sum(angles[s:e]) / (e - s))
+
+        min_a = min(smoothed)
+        max_a = max(smoothed)
+        if (max_a - min_a) < 15:
+            return []
+
+        valley_threshold = min_a + (max_a - min_a) * 0.35
+        rep_segments: list[tuple[int, int]] = []
+        in_valley = False
+        seg_start = 0
+
+        for i in range(len(smoothed)):
+            if smoothed[i] < valley_threshold:
+                if not in_valley:
+                    in_valley  = True
+                    seg_start  = i
+            else:
+                if in_valley:
+                    in_valley = False
+                    rep_segments.append((seg_start, i))
+
+        per_rep = []
+        for start, end in rep_segments:
+            rep_frames = frame_flags[start:end]
+            if not rep_frames:
+                continue
+            avg_risk = sum(f.get("frame_risk", 0) for f in rep_frames) / len(rep_frames)
+            quality  = max(0, min(100, round(100 - avg_risk)))
+            per_rep.append(quality)
+
+        return per_rep

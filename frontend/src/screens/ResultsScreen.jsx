@@ -5,7 +5,8 @@ import {
   CheckCircle, AlertTriangle, XCircle, TrendingUp, Eye,
   Activity, Zap, RotateCcw, ChevronLeft, ChevronRight,
   Heart, Calendar, Sunrise, GitCompareArrows, Bookmark,
-  BookmarkCheck, AlertCircle,
+  BookmarkCheck, AlertCircle, ShieldAlert, BookOpen, Gauge,
+  BarChart2, FlaskConical,
 } from 'lucide-react'
 import { useStore } from '../store'
 import AnimatedBar from '../components/AnimatedBar'
@@ -131,6 +132,173 @@ function ThreeDMetrics({ supplementary }) {
   )
 }
 
+// ─── Analysis Confidence chip ─────────────────────────────────────────────────
+function ConfidenceChip({ confidence }) {
+  if (!confidence) return null
+  const color = confidence >= 85 ? 'text-success bg-success/10 border-success/25'
+               : confidence >= 65 ? 'text-warning bg-warning/10 border-warning/25'
+               : 'text-danger bg-danger/10 border-danger/25'
+  return (
+    <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold border ${color}`}>
+      <Gauge size={11} aria-hidden />
+      {confidence}% confidence
+    </span>
+  )
+}
+
+// ─── Risk breakdown explainability (per-metric) ───────────────────────────────
+function RiskBreakdown({ breakdown, scoreItems }) {
+  if (!breakdown || Object.keys(breakdown).length === 0) return null
+
+  const keyMap = {
+    knee_valgus_left:  'Left Knee Stability',
+    knee_valgus_right: 'Right Knee Stability',
+    trunk_lean:        'Trunk Posture',
+    asymmetry:         'Movement Symmetry',
+  }
+
+  const entries = Object.entries(breakdown).filter(([, v]) => v.frames_exceeded_pct > 0)
+  if (entries.length === 0) return null
+
+  return (
+    <div className="mt-4 pt-4 border-t border-border-subtle">
+      <p className="text-xs font-semibold text-text-secondary mb-3 flex items-center gap-1.5">
+        <FlaskConical size={12} className="text-accent-primary" />
+        Biomechanical Breakdown
+      </p>
+      <div className="flex flex-col gap-2.5">
+        {entries.map(([key, v]) => (
+          <div key={key} className="text-xs px-3 py-2.5 rounded-xl bg-bg-elevated border border-border-subtle">
+            <p className="font-semibold text-text-primary mb-1">{keyMap[key] ?? key}</p>
+            <div className="flex flex-wrap gap-x-4 gap-y-0.5 text-text-muted">
+              <span>{v.frames_exceeded_pct}% of frames exceeded threshold</span>
+              {v.worst_deviation_deg > 0 && (
+                <span>Worst deviation: <span className="font-mono text-danger">{v.worst_deviation_deg}°</span></span>
+              )}
+              <span>Threshold: <span className="font-mono">{v.threshold_deg}°</span></span>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+// ─── Sport-specific injury risk flags ────────────────────────────────────────
+function SportInjuryFlags({ flags, sport }) {
+  if (!flags || flags.length === 0) return null
+
+  const levelMeta = {
+    elevated: { cls: 'border-danger/30 bg-danger/5 text-danger',  Icon: XCircle,       label: 'Elevated' },
+    moderate: { cls: 'border-warning/30 bg-warning/5 text-warning', Icon: AlertTriangle, label: 'Moderate' },
+    watch:    { cls: 'border-blue-500/25 bg-blue-500/5 text-blue-400', Icon: AlertCircle, label: 'Monitor'  },
+  }
+
+  return (
+    <div className="flex flex-col gap-2.5">
+      {flags.map((flag, i) => {
+        const meta = levelMeta[flag.risk_level] ?? levelMeta.watch
+        return (
+          <div key={i} className={`flex items-start gap-3 p-3 rounded-xl border ${meta.cls}`}>
+            <meta.Icon size={15} className={`flex-shrink-0 mt-0.5 ${meta.cls.split(' ').find(c => c.startsWith('text-'))}`} aria-hidden />
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 mb-0.5 flex-wrap">
+                <span className="text-xs font-bold text-text-primary">{flag.injury_name}</span>
+                <span className={`text-[10px] px-1.5 py-0.5 rounded-full border font-semibold ${meta.cls}`}>{meta.label}</span>
+                <span className="text-[10px] text-text-muted">via {flag.affected_metric}</span>
+              </div>
+              <p className="text-xs text-text-muted leading-relaxed">{flag.description}</p>
+            </div>
+          </div>
+        )
+      })}
+      <p className="text-[10px] text-text-muted leading-snug border-t border-border-subtle pt-2 mt-1">
+        Risk patterns are heuristic biomechanical indicators derived from sports medicine literature.
+        Interpret as screening signals — not clinical diagnoses.
+      </p>
+    </div>
+  )
+}
+
+// ─── Per-rep quality bars ─────────────────────────────────────────────────────
+function PerRepQuality({ perRepQuality }) {
+  if (!perRepQuality || perRepQuality.length === 0) return null
+  return (
+    <div className="mt-4 pt-4 border-t border-border-subtle">
+      <p className="text-xs font-semibold text-text-secondary mb-3 flex items-center gap-1.5">
+        <BarChart2 size={12} className="text-accent-primary" />
+        Per-Rep Quality
+      </p>
+      <div className="flex flex-col gap-2">
+        {perRepQuality.map((q, i) => {
+          const color = q >= 75 ? 'bg-success' : q >= 50 ? 'bg-warning' : 'bg-danger'
+          const textColor = q >= 75 ? 'text-success' : q >= 50 ? 'text-warning' : 'text-danger'
+          return (
+            <div key={i} className="flex items-center gap-3">
+              <span className="text-xs text-text-muted w-10 shrink-0 text-right">Rep {i + 1}</span>
+              <div className="flex-1 h-2.5 rounded-full bg-bg-elevated overflow-hidden">
+                <motion.div
+                  className={`h-full rounded-full ${color}`}
+                  initial={{ width: 0 }}
+                  animate={{ width: `${q}%` }}
+                  transition={{ delay: i * 0.08, duration: 0.5, ease: 'easeOut' }}
+                />
+              </div>
+              <span className={`text-xs font-mono font-bold w-8 ${textColor}`}>{q}</span>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+// ─── Research references panel ────────────────────────────────────────────────
+const RESEARCH_REFS = [
+  { id: 1, title: 'MediaPipe: A Framework for Building Perception Pipelines', authors: 'Lugaresi et al.', year: '2019', source: 'Google Research / arXiv' },
+  { id: 2, title: 'Knee Valgus and ACL Injury Risk: A Systematic Review', authors: 'Hewett et al.', year: '2005', source: 'Am J Sports Med' },
+  { id: 3, title: 'Trunk Lean Biomechanics and Lower Extremity Loading During Landing', authors: 'Blackburn & Padua', year: '2009', source: 'Clin Biomech' },
+  { id: 4, title: 'Fatigue and Neuromuscular Injury Risk in Athletes', authors: 'Benjaminse et al.', year: '2011', source: 'Sports Med' },
+  { id: 5, title: 'Movement Screening in Sport: Functional Movement Screen Validity', authors: 'Plisky et al.', year: '2009', source: 'Int J Sports Phys Ther' },
+]
+
+function ResearchReferences() {
+  const [open, setOpen] = useState(false)
+  return (
+    <div className="border border-border-subtle rounded-2xl overflow-hidden">
+      <button
+        onClick={() => setOpen(o => !o)}
+        className="w-full flex items-center justify-between gap-3 px-5 py-3.5 text-left hover:bg-bg-elevated transition-colors"
+      >
+        <span className="flex items-center gap-2 text-xs font-semibold text-text-secondary">
+          <BookOpen size={13} className="text-accent-primary" />
+          Biomechanics Methodology &amp; References
+        </span>
+        <ChevronRight size={14} className={`text-text-muted transition-transform ${open ? 'rotate-90' : ''}`} />
+      </button>
+      {open && (
+        <div className="px-5 pb-4 flex flex-col gap-2 border-t border-border-subtle">
+          <p className="text-xs text-text-muted leading-relaxed pt-3 mb-1">
+            InjuryLens uses MediaPipe Pose (33-landmark skeleton) to extract joint angles frame-by-frame.
+            Biomechanical thresholds (knee valgus, trunk lean, bilateral asymmetry) are derived from
+            established sports medicine literature. Risk scores represent the percentage of frames
+            where a metric exceeded its movement-specific safety threshold.
+          </p>
+          {RESEARCH_REFS.map(ref => (
+            <div key={ref.id} className="flex gap-2 text-xs">
+              <span className="text-accent-primary/60 font-mono shrink-0">[{ref.id}]</span>
+              <span className="text-text-muted leading-snug">
+                <span className="text-text-secondary font-medium">{ref.authors} ({ref.year}). </span>
+                {ref.title}. <span className="italic">{ref.source}.</span>
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ─── Frame gallery (worst / best / middle) with ghost overlay (Features 3) ──
 function FrameGallery({ annotated_frame, annotated_frames, movementType }) {
   const frames = useMemo(() => {
@@ -237,6 +405,7 @@ export default function ResultsScreen() {
   const {
     movement_type, scores, supplementary, ai_coaching,
     annotated_frame, annotated_frames, frame_timeline,
+    risk_breakdown, sport_injury_flags,
   } = results
 
   const overallLevel = ai_coaching?.overall_risk_level ?? 'Moderate'
@@ -269,10 +438,12 @@ export default function ResultsScreen() {
   const fatigueColor  = fatigueScore < 20 ? 'text-success' : fatigueScore < 50 ? 'text-warning' : 'text-danger'
   const fatigueLabel  = fatigueScore < 20 ? 'Minimal' : fatigueScore < 50 ? 'Moderate' : 'Significant'
 
-  const injuryProb  = supplementary?.injury_probability_4w ?? 0
-  const mqsScore    = supplementary?.mqs_score    ?? 0
-  const mqsGrade    = supplementary?.mqs_grade    ?? 'C'
+  const injuryProb    = supplementary?.injury_probability_4w ?? 0
+  const mqsScore      = supplementary?.mqs_score    ?? 0
+  const mqsGrade      = supplementary?.mqs_grade    ?? 'C'
   const mqsPercentile = supplementary?.mqs_percentile ?? 50
+  const confidence    = supplementary?.analysis_confidence ?? null
+  const perRepQuality = supplementary?.per_rep_quality ?? []
 
   const handleSave = () => {
     saveCurrentToHistory()
@@ -294,6 +465,7 @@ export default function ResultsScreen() {
             <span className="text-xs text-text-secondary hidden sm:block shrink-0">Analysis:</span>
             <span className="text-xs font-semibold text-text-primary truncate">{movement_type}</span>
             <RiskBadge level={overallLevel} />
+            {confidence && <ConfidenceChip confidence={confidence} />}
             {repCount > 0 && (
               <span className="text-xs text-text-muted hidden md:inline font-mono shrink-0">{repCount} reps</span>
             )}
@@ -405,6 +577,7 @@ export default function ResultsScreen() {
                     Consider reducing volume until technique is consistent throughout.
                   </p>
                 )}
+                <PerRepQuality perRepQuality={perRepQuality} />
               </Card>
             )}
 
@@ -430,6 +603,7 @@ export default function ResultsScreen() {
                   />
                 ))}
               </div>
+              <RiskBreakdown breakdown={risk_breakdown} scoreItems={scoreItems} />
             </Card>
 
             {/* Accordion feedback */}
@@ -554,6 +728,16 @@ export default function ResultsScreen() {
               </Card>
             )}
 
+            {/* Sport-specific injury risk flags */}
+            {sport_injury_flags?.length > 0 && (
+              <Card index={5}>
+                <CardTitle icon={ShieldAlert} iconClass="text-warning">
+                  Sport-Specific Injury Risk Patterns
+                </CardTitle>
+                <SportInjuryFlags flags={sport_injury_flags} sport={results?.sport} />
+              </Card>
+            )}
+
             {/* Positive observation */}
             <Card index={6} className="border-l-4 border-l-success">
               <CardTitle icon={Star} iconClass="text-success">What You're Doing Well</CardTitle>
@@ -584,6 +768,11 @@ export default function ResultsScreen() {
               </div>
             </Card>
           </div>
+        </div>
+
+        {/* ─── Research References (full-width) ─── */}
+        <div className="mt-5 mb-8">
+          <ResearchReferences />
         </div>
       </div>
     </div>
