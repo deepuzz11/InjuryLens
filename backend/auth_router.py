@@ -1,3 +1,4 @@
+import hashlib
 import secrets
 import smtplib
 import logging
@@ -25,29 +26,42 @@ router   = APIRouter(prefix="/auth", tags=["auth"])
 _bearer  = HTTPBearer()
 
 
+def _hash_reset_token(token: str) -> str:
+    """One-way hash for storing reset tokens — never store the raw token."""
+    return hashlib.sha256(token.encode()).hexdigest()
+
+
 # ── Helpers ──────────────────────────────────────────────────────────────────
 
 def _send_reset_email(to_email: str, token: str) -> None:
-    """Send password-reset email via SMTP if configured; otherwise log the token."""
+    """Send password-reset email via SMTP if configured; otherwise warn (no token logged)."""
     if not (settings.SMTP_HOST and settings.SMTP_USER and settings.SMTP_PASSWORD):
-        logger.info(
-            "SMTP not configured — password reset token for %s: %s  "
-            "(Add SMTP_HOST/SMTP_USER/SMTP_PASSWORD to .env to send real emails.)",
-            to_email, token,
+        logger.warning(
+            "SMTP not configured — reset link for %s was NOT sent. "
+            "Set SMTP_HOST/SMTP_USER/SMTP_PASSWORD in .env to enable email delivery.",
+            to_email,
         )
         return
 
-    reset_url  = f"{settings.APP_URL}?reset_token={token}"
+    # The token is shown as copyable text — NOT embedded in a URL query-string —
+    # so it does not appear in server logs, browser history, or proxy caches.
+    app_url    = settings.APP_URL
     from_addr  = settings.SMTP_FROM or settings.SMTP_USER
     subject    = f"{settings.APP_NAME} — Password Reset"
     body_text  = (
         f"A password reset was requested for your {settings.APP_NAME} account.\n\n"
-        f"Reset link (expires in 1 hour):\n{reset_url}\n\n"
+        f"Your reset token (expires in 1 hour):\n\n    {token}\n\n"
+        f"Open {app_url} and use the 'Forgot password → I have my reset token' "
+        "flow to set a new password.\n\n"
         "If you did not request this, you can safely ignore this email."
     )
     body_html  = (
         f"<p>A password reset was requested for your <strong>{settings.APP_NAME}</strong> account.</p>"
-        f"<p><a href='{reset_url}'>Click here to reset your password</a> (expires in 1 hour).</p>"
+        f"<p>Your reset token (expires in 1 hour):</p>"
+        f"<pre style='background:#f4f4f4;padding:12px 16px;border-radius:8px;"
+        f"font-size:15px;letter-spacing:1px;font-family:monospace'>{token}</pre>"
+        f"<p><a href='{app_url}'>Open {settings.APP_NAME}</a> and click "
+        f"<em>Forgot password? → I have my reset token</em> to complete the reset.</p>"
         "<p>If you did not request this, you can safely ignore this email.</p>"
     )
 
@@ -62,12 +76,12 @@ def _send_reset_email(to_email: str, token: str) -> None:
         with smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT, timeout=10) as smtp:
             smtp.ehlo()
             smtp.starttls()
+            smtp.ehlo()  # Re-advertise capabilities after TLS handshake (RFC 3207)
             smtp.login(settings.SMTP_USER, settings.SMTP_PASSWORD)
             smtp.sendmail(from_addr, [to_email], msg.as_string())
         logger.info("Password reset email sent to %s", to_email)
     except Exception as exc:
         logger.error("Failed to send reset email to %s: %s", to_email, exc)
-        logger.info("Manual fallback — reset token for %s: %s", to_email, token)
 
 
 def _hash(password: str) -> str:
@@ -124,7 +138,7 @@ def forgot_password(request: Request, body: ForgotPasswordRequest, db: Session =
     user = db.query(User).filter(User.email == body.email).first()
     if user:
         token = secrets.token_urlsafe(32)
-        user.reset_token         = token
+        user.reset_token         = _hash_reset_token(token)  # store hash, not plaintext
         user.reset_token_expires = datetime.now(timezone.utc) + timedelta(hours=1)
         db.commit()
         _send_reset_email(user.email, token)
@@ -135,7 +149,7 @@ def forgot_password(request: Request, body: ForgotPasswordRequest, db: Session =
 @router.post("/reset-password", response_model=MessageResponse)
 @limiter.limit("5/minute")
 def reset_password(request: Request, body: ResetPasswordRequest, db: Session = Depends(get_db)):
-    user = db.query(User).filter(User.reset_token == body.token).first()
+    user = db.query(User).filter(User.reset_token == _hash_reset_token(body.token)).first()
     if not user or not user.reset_token_expires:
         raise HTTPException(status_code=400, detail="Invalid or expired reset token.")
     # Normalise to UTC regardless of whether the DB stored tz-aware or naive datetime

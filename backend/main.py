@@ -162,7 +162,7 @@ _MAGIC: dict[str, callable] = {
     ".webm": lambda h: h[:4] == b"\x1a\x45\xdf\xa3",
 }
 
-_SAFE_FIELD_RE = re.compile(r"[^\w\s\-–—/(),.'\"]+", re.UNICODE)
+_SAFE_FIELD_RE = re.compile(r"[^\w\s\-–—/+]+", re.UNICODE)
 _MAX_FIELD_LEN = 100
 
 
@@ -194,6 +194,9 @@ SUPPORTED_MOVEMENTS = [
     MovementInfo(id="Split Squat",    label="Split Squat",      category="Lower Body",  description="Unilateral squat pattern with staggered stance.", key_metrics=["knee valgus", "trunk control", "hip stability"], difficulty="Intermediate"),
     MovementInfo(id="Bench Press",    label="Bench Press",      category="Upper Body",  description="Horizontal push pattern with shoulder and chest assessment.", key_metrics=["shoulder asymmetry", "elbow flare", "wrist alignment"], difficulty="Intermediate"),
 ]
+
+
+_SUPPORTED_MOVEMENT_IDS = {m.id for m in SUPPORTED_MOVEMENTS}
 
 
 def _risk_level_from_score(overall: int) -> str:
@@ -391,6 +394,15 @@ async def analyze_video(
     goal          = _sanitize_form_field(goal)
     sport         = _sanitize_form_field(sport)
 
+    if movement_type not in _SUPPORTED_MOVEMENT_IDS:
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                f"Unsupported movement type '{movement_type}'. "
+                f"Supported: {', '.join(sorted(_SUPPORTED_MOVEMENT_IDS))}."
+            ),
+        )
+
     request_start = time.time()
     logger.info(
         f"Analysis — movement: {movement_type!r}, fitness: {fitness_level!r}, "
@@ -443,22 +455,24 @@ async def analyze_video(
 
         logger.info(f"Video saved to {tmp_path} ({total_size / 1024:.0f} KB)")
 
-        # 1. Extract pose landmarks
+        # 1. Extract pose landmarks (CPU/IO-heavy — run off the event loop)
         try:
-            frames, metadata = pose_extractor.extract(tmp_path)
+            frames, metadata = await asyncio.to_thread(pose_extractor.extract, tmp_path)
         except ValueError as exc:
             raise HTTPException(status_code=422, detail=str(exc))
 
         logger.info(f"Pose extraction: {len(frames)} valid frames")
 
-        # 2. Biomechanical analysis (movement-aware)
-        frame_flags, avg_stats = biomechanics_engine.analyze(frames, movement_type)
+        # 2. Biomechanical analysis (movement-aware, CPU-heavy)
+        frame_flags, avg_stats = await asyncio.to_thread(
+            biomechanics_engine.analyze, frames, movement_type
+        )
 
-        # 3. Risk scoring
-        scores     = risk_scorer.score(frame_flags, movement_type)
+        # 3. Risk scoring (CPU-heavy)
+        scores     = await asyncio.to_thread(risk_scorer.score, frame_flags, movement_type)
         risk_level = _risk_level_from_score(scores["overall"])
 
-        # 4. Annotate frames (single video-open, one MediaPipe session for all three)
+        # 4. Annotate frames (opens video again — CPU/IO-heavy)
         worst_valid_idx  = avg_stats["worst_frame_index"]
         best_valid_idx   = avg_stats["best_frame_index"]
         middle_valid_idx = avg_stats["middle_frame_index"]
@@ -468,8 +482,9 @@ async def analyze_video(
         best_actual   = valid_indices[best_valid_idx]
         middle_actual = valid_indices[middle_valid_idx]
 
-        annotated_set = frame_annotator.annotate_multiple(
-            tmp_path, worst_actual, best_actual, middle_actual, scores, risk_level
+        annotated_set = await asyncio.to_thread(
+            frame_annotator.annotate_multiple,
+            tmp_path, worst_actual, best_actual, middle_actual, scores, risk_level,
         )
         annotated_b64 = annotated_set["worst"]  # worst frame also serves as the primary annotated image
 

@@ -406,7 +406,7 @@ export default function ResultsScreen() {
     movement_type, scores, supplementary, ai_coaching,
     annotated_frame, annotated_frames, frame_timeline,
     risk_breakdown, sport_injury_flags,
-  } = results
+  } = results ?? {}
 
   const overallLevel = ai_coaching?.overall_risk_level ?? 'Moderate'
 

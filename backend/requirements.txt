@@ -13,6 +13,9 @@ python-dotenv==1.0.1
 sqlalchemy==2.0.30
 bcrypt==4.0.1
 python-jose[cryptography]==3.3.0
+# ── Optional: Redis-backed rate-limiting (multi-worker deployments) ────────
+# Set REDIS_URL=redis://localhost:6379 in .env, then uncomment:
+# limits[redis]>=3.6.0
 # ── Future: MongoDB (uncomment when switching DB_TYPE=mongodb) ─────────────
 # motor==3.4.0
 # pymongo==4.7.2

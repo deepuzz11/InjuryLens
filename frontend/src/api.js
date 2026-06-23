@@ -63,7 +63,7 @@ export async function analyzeVideo(formData) {
  * GET /health — server health check.
  */
 export async function checkHealth() {
-  const response = await fetch(`${API_BASE}/health`)
+  const response = await _fetchWithTimeout(`${API_BASE}/health`)
   if (!response.ok) throw new Error('Health check failed')
   return response.json()
 }
@@ -72,7 +72,7 @@ export async function checkHealth() {
  * GET /movements — list all supported movement types.
  */
 export async function fetchMovements() {
-  const response = await fetch(`${API_BASE}/movements`)
+  const response = await _fetchWithTimeout(`${API_BASE}/movements`)
   if (!response.ok) return null
   return response.json()
 }
@@ -156,5 +156,5 @@ export function downloadTextReport(results) {
   a.href     = url
   a.download = `InjuryLens_${movement_type.replace(/\s+/g, '_')}_${Date.now()}.txt`
   a.click()
-  URL.revokeObjectURL(url)
+  setTimeout(() => URL.revokeObjectURL(url), 100)
 }

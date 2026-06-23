@@ -1,6 +1,22 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 
+const AUTH_TIMEOUT_MS = 10_000
+
+async function _authFetch(url, options = {}) {
+  const controller = new AbortController()
+  const timeoutId  = setTimeout(() => controller.abort(), AUTH_TIMEOUT_MS)
+  try {
+    const res = await fetch(url, { ...options, signal: controller.signal })
+    clearTimeout(timeoutId)
+    return res
+  } catch (err) {
+    clearTimeout(timeoutId)
+    if (err.name === 'AbortError') throw new Error('Request timed out. Please check your connection and try again.')
+    throw err
+  }
+}
+
 // ─── Achievement definitions ──────────────────────────────────────────────────
 const ACHIEVEMENTS = [
   { id: 'first_analysis',    label: 'First Step',        desc: 'Complete your first analysis',              icon: '🎯', xp: 50,  condition: (h) => h.length >= 1  },
@@ -10,7 +26,7 @@ const ACHIEVEMENTS = [
   { id: 'streak_3',          label: '3-Day Streak',      desc: 'Analyze 3 days in a row',                   icon: '🔥', xp: 100, condition: (_, streak) => streak >= 3  },
   { id: 'streak_7',          label: 'Week Warrior',      desc: 'Analyze 7 days in a row',                   icon: '⚡', xp: 300, condition: (_, streak) => streak >= 7  },
   { id: 'streak_14',         label: 'Iron Discipline',   desc: 'Analyze 14 days in a row',                  icon: '🛡️', xp: 600, condition: (_, streak) => streak >= 14 },
-  { id: 'improvement_10',    label: 'Getting Better',    desc: 'Improve risk score by 10+ points',          icon: '📈', xp: 200, condition: (h) => h.length >= 2 && (h[1]?.scores?.overall ?? 0) - (h[0]?.scores?.overall ?? 0) >= 10 },
+  { id: 'improvement_10',    label: 'Getting Better',    desc: 'Improve risk score by 10+ points',          icon: '📈', xp: 200, condition: (h) => { if (h.length < 2) return false; const best = h.slice(1).reduce((m, e) => Math.max(m, e.scores?.overall ?? 0), 0); return best - (h[0]?.scores?.overall ?? 0) >= 10 } },
   { id: 'improvement_30',    label: 'Transformation',    desc: 'Improve risk score by 30+ points',          icon: '🏆', xp: 500, condition: (h) => h.length >= 2 && (h[h.length-1]?.scores?.overall ?? 0) - (h[0]?.scores?.overall ?? 0) >= 30 },
   { id: 'five_movements',    label: 'Well Rounded',      desc: 'Analyze 5 different movement types',        icon: '🤸', xp: 250, condition: (h) => new Set(h.map((e) => e.movement_type)).size >= 5 },
   { id: 'all_movements',     label: 'Movement Master',   desc: 'Analyze all 12 movement types',             icon: '🌟', xp: 800, condition: (h) => new Set(h.map((e) => e.movement_type)).size >= 12 },
@@ -27,6 +43,9 @@ function computeAchievements(history, streak, goals = [], recoveryLogs = []) {
 function computeStreak(history) {
   if (!history.length) return 0
   const sorted = [...history].sort((a, b) => new Date(b.date) - new Date(a.date))
+  // If the most recent entry is older than yesterday the streak is already broken.
+  const daysSinceLast = Math.floor((Date.now() - new Date(sorted[0].date)) / 86400000)
+  if (daysSinceLast > 1) return 0
   let streak = 1
   for (let i = 1; i < sorted.length; i++) {
     const prev = new Date(sorted[i - 1].date)
@@ -70,7 +89,7 @@ export const useStore = create(
 
       logout: () => set({
         isAuthenticated: false, authUser: null, authToken: null,
-        screen: 'upload', results: null, error: null,
+        screen: 'upload', results: null, error: null, isLoading: false,
       }),
 
       loginAsDemo: () => {
@@ -97,7 +116,7 @@ export const useStore = create(
           // Day 9 — Lunge
           { id: uid('h',7),  date: d(9),  movement_type:'Lunge',        scores:{overall:48, knee_valgus_left:36, knee_valgus_right:30, trunk_lean:40, asymmetry:28, shoulder:24}, supplementary:{avg_left_knee_angle:89, avg_right_knee_angle:90, avg_trunk_lean_angle:32, total_frames_analyzed:142, rep_count:10, fatigue_score:34, mqs_score:58, mqs_grade:'D', injury_probability_4w:0.26}, ai_coaching:{overall_risk_level:'moderate', overall_summary:'Lunge quality inconsistent — right side compensation pattern.', priority_issue:'Right hip dropping on left-leg lunges.'}, annotated_frame:null, profileId:'default' },
           // Day 12 — Push-up
-          { id: uid('h',8),  date: d(12), movement_type:'Push-up',      scores:{overall:42, knee_valgus_left:8,  knee_valgus_right:7,  trunk_lean:48, asymmetry:22, shoulder:44}, supplementary:{avg_left_knee_angle:null,avg_right_knee_angle:null, avg_trunk_lean_angle:40, total_frames_analyzed:132, rep_count:15, fatigue_score:28, mqs_score:62, mqs_grade:'D', injury_probability_4w:0.22}, ai_coaching:{overall_risk_level:'moderate', overall_summary:'Push-up form is OK but shoulder asymmetry needs work.',      priority_issue:'Right shoulder drops below left — rotator cuff imbalance.'}, annotated_frame:null, profileId:'default' },
+          { id: uid('h',8),  date: d(12), movement_type:'Push-up',      scores:{overall:42, knee_valgus_left:8,  knee_valgus_right:7,  trunk_lean:48, asymmetry:22, shoulder:44}, supplementary:{avg_left_knee_angle:174,avg_right_knee_angle:175, avg_trunk_lean_angle:40, total_frames_analyzed:132, rep_count:15, fatigue_score:28, mqs_score:62, mqs_grade:'D', injury_probability_4w:0.22}, ai_coaching:{overall_risk_level:'moderate', overall_summary:'Push-up form is OK but shoulder asymmetry needs work.',      priority_issue:'Right shoulder drops below left — rotator cuff imbalance.'}, annotated_frame:null, profileId:'default' },
           // Day 14 — Squat
           { id: uid('h',9),  date: d(14), movement_type:'Squat',        scores:{overall:52, knee_valgus_left:42, knee_valgus_right:36, trunk_lean:44, asymmetry:30, shoulder:26}, supplementary:{avg_left_knee_angle:86, avg_right_knee_angle:87, avg_trunk_lean_angle:36, total_frames_analyzed:174, rep_count:8,  fatigue_score:36, mqs_score:54, mqs_grade:'D', injury_probability_4w:0.30}, ai_coaching:{overall_risk_level:'high',     overall_summary:'High risk session — significant knee valgus under load.',  priority_issue:'Load too heavy for current valgus control — reduce weight.'}, annotated_frame:null, profileId:'default' },
           // Day 16 — Jump Landing
@@ -192,7 +211,7 @@ export const useStore = create(
         set({
           isAuthenticated: true,
           authUser: { id: 1, name: 'Alex Rivera', email: 'demo@injurylens.com' },
-          authToken: 'demo-token',
+          authToken: null,
           screen: 'upload',
           history,
           goals,
@@ -222,47 +241,47 @@ export const useStore = create(
       },
 
       registerUser: async (name, email, password) => {
-        const res = await fetch(`${AUTH_API}/register`, {
+        const res = await _authFetch(`${AUTH_API}/register`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ name, email, password }),
         })
-        const data = await res.json()
+        const data = await res.json().catch(() => ({}))
         if (!res.ok) throw new Error(data.detail || 'Registration failed.')
         set({ isAuthenticated: true, authUser: data.user, authToken: data.access_token })
         return data
       },
 
       loginUser: async (email, password) => {
-        const res = await fetch(`${AUTH_API}/login`, {
+        const res = await _authFetch(`${AUTH_API}/login`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ email, password }),
         })
-        const data = await res.json()
+        const data = await res.json().catch(() => ({}))
         if (!res.ok) throw new Error(data.detail || 'Login failed.')
         set({ isAuthenticated: true, authUser: data.user, authToken: data.access_token })
         return data
       },
 
       forgotPassword: async (email) => {
-        const res = await fetch(`${AUTH_API}/forgot-password`, {
+        const res = await _authFetch(`${AUTH_API}/forgot-password`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ email }),
         })
-        const data = await res.json()
+        const data = await res.json().catch(() => ({}))
         if (!res.ok) throw new Error(data.detail || 'Request failed.')
         return data
       },
 
       resetPassword: async (token, newPassword) => {
-        const res = await fetch(`${AUTH_API}/reset-password`, {
+        const res = await _authFetch(`${AUTH_API}/reset-password`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ token, new_password: newPassword }),
         })
-        const data = await res.json()
+        const data = await res.json().catch(() => ({}))
         if (!res.ok) throw new Error(data.detail || 'Reset failed.')
         return data
       },
@@ -491,7 +510,7 @@ export const useStore = create(
       },
 
       clearHistory: () => {
-        set({ history: [], streak: 0, earnedAchievements: [], weeklyChallenge: { goal: 3, completedThisWeek: 0, weekStart: null }, totalXP: 0 })
+        set({ history: [], streak: 0, longestStreak: 0, earnedAchievements: [], weeklyChallenge: { goal: 3, completedThisWeek: 0, weekStart: null }, totalXP: 0 })
       },
 
       viewHistoryItem: (id) => {
@@ -513,12 +532,12 @@ export const useStore = create(
         state.goals.forEach((goal) => {
           if (goal.achieved) return
           const metricMap = {
-            overall:          latestEntry.scores?.overall,
-            knee_valgus_left:  latestEntry.scores?.knee_valgus_left,
-            knee_valgus_right: latestEntry.scores?.knee_valgus_right,
-            trunk_lean:        latestEntry.scores?.trunk_lean,
-            asymmetry:         latestEntry.scores?.asymmetry,
-            shoulder:          latestEntry.scores?.shoulder,
+            overall:            latestEntry.scores?.overall,
+            knee_valgus_left:   latestEntry.scores?.knee_valgus_left,
+            knee_valgus_right:  latestEntry.scores?.knee_valgus_right,
+            trunk_lean:         latestEntry.scores?.trunk_lean,
+            asymmetry:          latestEntry.scores?.asymmetry,
+            shoulder_asymmetry: latestEntry.scores?.shoulder_asymmetry,
           }
           const current = metricMap[goal.metric]
           if (current !== undefined && goal.movement_type === latestEntry.movement_type) {

@@ -25,6 +25,14 @@ class Settings(BaseSettings):
     # CORS — override in production: ALLOWED_ORIGINS='["https://yourapp.com"]'
     ALLOWED_ORIGINS: List[str] = ["http://localhost:5173", "http://localhost:3000"]
 
+    # ── Rate limiting ────────────────────────────────────────────────────────
+    # Set REDIS_URL to share rate-limit state across multiple workers.
+    # Install limits[redis] first: pip install "limits[redis]"
+    REDIS_URL: str = ""
+    # Comma-separated trusted reverse-proxy IPs/CIDRs (e.g. "10.0.0.1,172.16.0.0/12").
+    # Only connections from these addresses may use X-Forwarded-For for rate-limit keying.
+    TRUSTED_PROXY_IPS: List[str] = []
+
     # ── Database — set DB_TYPE="mongodb" + MONGODB_URL to switch backends ───
     DB_TYPE: str = "sqlite"                          # "sqlite" | "mongodb"
     DATABASE_URL: str = "sqlite:///./injurylens.db"
@@ -49,17 +57,32 @@ class Settings(BaseSettings):
     def validate_secret_key(cls, v: str) -> str:
         if v != _INSECURE_DEFAULT_KEY:
             return v
+        import re as _re
         random_key = secrets.token_hex(32)
-        # Persist the generated key to .env so it survives server restarts.
         env_path = pathlib.Path(__file__).parent / ".env"
         try:
             existing = env_path.read_text(encoding="utf-8") if env_path.exists() else ""
             if "SECRET_KEY" not in existing:
+                # Key absent — append the generated value so it survives restarts.
                 with env_path.open("a", encoding="utf-8") as f:
                     f.write(f"\nSECRET_KEY={random_key}\n")
                 _logger.info(
                     "Generated a stable SECRET_KEY and saved it to %s. "
                     "User sessions will now survive server restarts.",
+                    env_path,
+                )
+            else:
+                # Insecure placeholder is present — replace the line in-place so
+                # the next restart loads the stable key and sessions stay valid.
+                updated = _re.sub(
+                    r"(?m)^SECRET_KEY=.*$",
+                    f"SECRET_KEY={random_key}",
+                    existing,
+                )
+                env_path.write_text(updated, encoding="utf-8")
+                _logger.info(
+                    "Replaced insecure SECRET_KEY placeholder in %s — "
+                    "sessions will be stable from the next restart.",
                     env_path,
                 )
         except OSError as exc:

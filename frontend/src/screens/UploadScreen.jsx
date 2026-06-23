@@ -160,8 +160,11 @@ export default function UploadScreen() {
   const videoRef     = useRef(null)
 
   const validateFile = useCallback((f) => {
-    const ext = ('.' + f.name.split('.').pop()).toLowerCase()
-    if (!ALLOWED_EXTS.includes(ext) && !ALLOWED_TYPES.includes(f.type)) {
+    const ext    = ('.' + f.name.split('.').pop()).toLowerCase()
+    const extOk  = ALLOWED_EXTS.includes(ext)
+    // Allow empty MIME type (some OS/browsers omit it); reject known-bad MIME types.
+    const typeOk = !f.type || ALLOWED_TYPES.includes(f.type)
+    if (!extOk || !typeOk) {
       return 'Unsupported file type. Please upload MP4, MOV, AVI, or WebM.'
     }
     if (f.size > MAX_FILE_BYTES) return `File is ${fmtBytes(f.size)} — max 100 MB.`

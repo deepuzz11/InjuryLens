@@ -228,29 +228,40 @@ class BiomechanicsEngine:
         )
         return frame_flags, avg_stats
 
-    def _count_reps(self, frame_flags: list[dict]) -> int:
-        """Count repetitions by detecting valleys in mean knee angle."""
+    def _detect_valleys(self, frame_flags: list[dict]) -> list[tuple[int, int]]:
+        """Return (start, end) index pairs for each rep valley in mean knee angle."""
         if len(frame_flags) < 10:
-            return 0
+            return []
         angles   = [(f["left_knee_angle"] + f["right_knee_angle"]) / 2 for f in frame_flags]
         window   = max(3, len(angles) // 20)
         smoothed = self._smooth_angles(angles, window)
 
         min_a, max_a = min(smoothed), max(smoothed)
         if (max_a - min_a) < 15:
-            return 0
+            return []
 
         valley_threshold = min_a + (max_a - min_a) * 0.35
-        valleys   = 0
+        segments: list[tuple[int, int]] = []
         in_valley = False
-        for a in smoothed:
-            if a < valley_threshold:
+        seg_start = 0
+
+        for i, val in enumerate(smoothed):
+            if val < valley_threshold:
                 if not in_valley:
                     in_valley = True
-                    valleys  += 1
+                    seg_start = i
             else:
-                in_valley = False
-        return valleys
+                if in_valley:
+                    in_valley = False
+                    segments.append((seg_start, i))
+        if in_valley:
+            segments.append((seg_start, len(smoothed)))
+
+        return segments
+
+    def _count_reps(self, frame_flags: list[dict]) -> int:
+        """Count repetitions by detecting valleys in mean knee angle."""
+        return len(self._detect_valleys(frame_flags))
 
     def _calculate_fatigue(self, frame_flags: list[dict]) -> int:
         """Compare form quality first-half vs second-half. Returns 0–100."""
@@ -267,39 +278,11 @@ class BiomechanicsEngine:
 
     def get_per_rep_quality(self, frame_flags: list[dict]) -> list[int]:
         """Quality score (0–100) for each detected rep based on average frame_risk."""
-        if len(frame_flags) < 10:
-            return []
-        angles   = [(f["left_knee_angle"] + f["right_knee_angle"]) / 2 for f in frame_flags]
-        window   = max(3, len(angles) // 20)
-        smoothed = self._smooth_angles(angles, window)
-
-        min_a, max_a = min(smoothed), max(smoothed)
-        if (max_a - min_a) < 15:
-            return []
-
-        valley_threshold = min_a + (max_a - min_a) * 0.35
-        rep_segments: list[tuple[int, int]] = []
-        in_valley = False
-        seg_start = 0
-
-        for i, val in enumerate(smoothed):
-            if val < valley_threshold:
-                if not in_valley:
-                    in_valley = True
-                    seg_start = i
-            else:
-                if in_valley:
-                    in_valley = False
-                    rep_segments.append((seg_start, i))
-        if in_valley:
-            rep_segments.append((seg_start, len(smoothed)))
-
         per_rep = []
-        for start, end in rep_segments:
+        for start, end in self._detect_valleys(frame_flags):
             rep_frames = frame_flags[start:end]
             if not rep_frames:
                 continue
             avg_risk = sum(f.get("frame_risk", 0) for f in rep_frames) / len(rep_frames)
             per_rep.append(max(0, min(100, round(100 - avg_risk))))
-
         return per_rep
