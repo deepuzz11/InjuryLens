@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { BookOpen, Plus, Trash2, X, ChevronLeft, ChevronRight, Smile, Frown, Meh, Star, Zap } from 'lucide-react'
 import { useStore } from '../store'
+import GlassSelect from '../components/GlassSelect'
 
 const MOODS = [
   { label: 'Terrible', icon: '😞', value: 1, color: '#ef4444' },
@@ -249,10 +250,11 @@ export default function TrainingJournalScreen() {
                   </div>
                   <div>
                     <label className="block text-xs font-semibold text-text-secondary mb-1">Session Type</label>
-                    <select value={form.type} onChange={(e) => setForm((f) => ({ ...f, type: e.target.value }))}
-                      className="w-full px-3 py-2 rounded-xl border border-border-subtle bg-bg-base text-sm text-text-primary focus:outline-none focus:border-accent-primary">
-                      {SESSION_TYPES.map((t) => <option key={t}>{t}</option>)}
-                    </select>
+                    <GlassSelect
+                      value={form.type}
+                      onChange={(val) => setForm((f) => ({ ...f, type: val }))}
+                      options={SESSION_TYPES}
+                    />
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-3">

@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { CalendarDays, Plus, X, CheckCircle, Trash2, ChevronLeft, ChevronRight, Clock } from 'lucide-react'
 import { useStore } from '../store'
+import GlassSelect from '../components/GlassSelect'
 
 const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 const SESSION_TYPES = ['Strength', 'Cardio', 'HIIT', 'Mobility', 'Sport Practice', 'Recovery', 'Rehab', 'Technique', 'Rest Day', 'Other']
@@ -260,10 +261,11 @@ export default function SessionPlannerScreen() {
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-text-secondary mb-1">Session Type</label>
-                  <select value={form.type} onChange={(e) => setForm((f) => ({ ...f, type: e.target.value }))}
-                    className="w-full px-3 py-2 rounded-xl border border-border-subtle bg-bg-base text-sm text-text-primary focus:outline-none focus:border-accent-primary">
-                    {SESSION_TYPES.map((t) => <option key={t}>{t}</option>)}
-                  </select>
+                  <GlassSelect
+                    value={form.type}
+                    onChange={(val) => setForm((f) => ({ ...f, type: val }))}
+                    options={SESSION_TYPES}
+                  />
                 </div>
                 <div>
                   <label className="flex justify-between text-xs font-semibold text-text-secondary mb-1">

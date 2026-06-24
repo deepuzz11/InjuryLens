@@ -538,6 +538,7 @@ export const useStore = create(
             trunk_lean:         latestEntry.scores?.trunk_lean,
             asymmetry:          latestEntry.scores?.asymmetry,
             shoulder_asymmetry: latestEntry.scores?.shoulder_asymmetry,
+            hip_drop:           latestEntry.scores?.hip_drop,
           }
           const current = metricMap[goal.metric]
           if (current !== undefined && goal.movement_type === latestEntry.movement_type) {

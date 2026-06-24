@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react'
 import { motion } from 'framer-motion'
 import { TrendingUp, Plus, Save } from 'lucide-react'
 import { useStore } from '../store'
+import GlassSelect from '../components/GlassSelect'
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, ReferenceLine } from 'recharts'
 
 const SPORTS = ['General Fitness', 'Football', 'Basketball', 'Soccer', 'Tennis', 'Running', 'Cycling', 'Swimming', 'CrossFit', 'Weightlifting', 'Gymnastics', 'Martial Arts', 'Rugby', 'Baseball', 'Volleyball', 'Track & Field', 'Other']
@@ -174,10 +175,11 @@ export default function AthleteMetricsScreen() {
               ))}
               <div className="col-span-2">
                 <label className="block text-xs font-semibold text-text-secondary mb-1">Sport</label>
-                <select value={formData.sport ?? 'General Fitness'} onChange={(e) => setFormData((f) => ({ ...f, sport: e.target.value }))}
-                  className="w-full px-3 py-2 rounded-xl border border-border-subtle bg-bg-base text-sm text-text-primary focus:outline-none focus:border-accent-primary">
-                  {SPORTS.map((s) => <option key={s}>{s}</option>)}
-                </select>
+                <GlassSelect
+                  value={formData.sport ?? 'General Fitness'}
+                  onChange={(val) => setFormData((f) => ({ ...f, sport: val }))}
+                  options={SPORTS}
+                />
               </div>
             </div>
           ) : (

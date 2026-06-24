@@ -402,6 +402,19 @@ export default function ResultsScreen() {
     history.some((h) => h.id === results?.analysis_id)
   )
 
+  if (!results) {
+    return (
+      <div className="min-h-screen mesh-bg flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-text-secondary mb-4">No analysis results available.</p>
+          <button onClick={reset} className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-accent-primary to-accent-secondary text-white text-sm font-semibold">
+            Start New Analysis
+          </button>
+        </div>
+      </div>
+    )
+  }
+
   const {
     movement_type, scores, supplementary, ai_coaching,
     annotated_frame, annotated_frames, frame_timeline,

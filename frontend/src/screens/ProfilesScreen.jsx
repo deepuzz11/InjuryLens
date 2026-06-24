@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { User, Plus, Edit2, Trash2, Check, X, Users, ChevronRight } from 'lucide-react'
 import { useStore } from '../store'
+import GlassSelect from '../components/GlassSelect'
 
 const FITNESS_LEVELS = ['Beginner', 'Intermediate', 'Advanced', 'Elite Athlete']
 const AGE_GROUPS     = ['Under 18', '18–24', '25–34', '35–44', '45–54', '55+']
@@ -43,13 +44,11 @@ function ProfileForm({ initial, onSave, onCancel }) {
           ].map(({ label, value, onChange, options }) => (
             <div key={label}>
               <label className="text-xs text-text-muted mb-1 block">{label}</label>
-              <select
+              <GlassSelect
                 value={value}
-                onChange={(e) => onChange(e.target.value)}
-                className="w-full px-3 py-2 rounded-xl glass border border-border-subtle text-sm text-text-primary bg-transparent focus:outline-none"
-              >
-                {options.map((o) => <option key={o} value={o}>{o || '— None —'}</option>)}
-              </select>
+                onChange={onChange}
+                options={options}
+              />
             </div>
           ))}
         </div>

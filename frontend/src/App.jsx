@@ -6,6 +6,7 @@ import UploadScreen   from './screens/UploadScreen'
 import LoadingScreen  from './screens/LoadingScreen'
 import LandingScreen  from './screens/LandingScreen'
 import Sidebar        from './components/Sidebar'
+import TopBar         from './components/TopBar'
 
 const ResultsScreen         = lazy(() => import('./screens/ResultsScreen'))
 const HistoryScreen         = lazy(() => import('./screens/HistoryScreen'))
@@ -86,14 +87,15 @@ function AppShell() {
   }
 
   return (
-    <div className="flex min-h-screen bg-bg-base">
+    <div className="flex h-screen overflow-hidden bg-bg-base">
       <Sidebar />
 
       {/* paddingLeft matches sidebar width — Sidebar sets --sidebar-w via CSS var */}
       <main
-        className="flex-1 min-w-0"
-        style={{ paddingLeft: 'var(--sidebar-w, 220px)', transition: 'padding-left 0.25s cubic-bezier(0.4,0,0.2,1)' }}
+        className="flex-1 min-w-0 h-screen overflow-y-auto"
+        style={{ paddingLeft: 'var(--sidebar-w, 228px)', transition: 'padding-left 0.25s cubic-bezier(0.4,0,0.2,1)' }}
       >
+        <TopBar />
         <AnimatePresence mode="wait">
           {SCREENS[screen] && (
             <motion.div

@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { Volume2, VolumeX, Loader, ChevronDown } from 'lucide-react'
+import GlassSelect from './GlassSelect'
 
 const SUPPORTED = typeof window !== 'undefined' && 'speechSynthesis' in window
 
@@ -115,13 +116,11 @@ export default function VoiceCoaching({ cues = [], summary = '', priority = '' }
           {voices.length > 0 && (
             <div className="mb-2">
               <label className="text-[10px] text-text-muted block mb-1">Voice</label>
-              <select
-                value={voiceIdx}
-                onChange={(e) => setVoiceIdx(Number(e.target.value))}
-                className="w-full text-xs px-2 py-1.5 rounded-lg glass border border-border-subtle text-text-primary bg-transparent"
-              >
-                {voices.map((v, i) => <option key={i} value={i}>{v.name}</option>)}
-              </select>
+              <GlassSelect
+                value={String(voiceIdx)}
+                onChange={(val) => setVoiceIdx(Number(val))}
+                options={voices.map((v, i) => ({ value: String(i), label: v.name }))}
+              />
             </div>
           )}
           <div>

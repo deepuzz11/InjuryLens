@@ -6,6 +6,7 @@ import {
 } from 'recharts'
 import { AlertTriangle, TrendingDown, TrendingUp, Minus, Activity, Info } from 'lucide-react'
 import { useStore } from '../store'
+import GlassSelect from '../components/GlassSelect'
 
 const BODY_METRICS = [
   { key: 'knee_valgus_left',  label: 'Left Knee',      zone: 'knee', color: '#f59e0b', emoji: '🦵', desc: 'Inward knee collapse (valgus) — ACL & meniscus risk' },
@@ -320,14 +321,15 @@ export default function BodyAnalyticsScreen() {
               </p>
               <p className="text-xs text-text-muted">Across all {history.length} sessions</p>
             </div>
-            <select
+            <GlassSelect
               value={selectedMetric}
-              onChange={(e) => setSelectedMetric(e.target.value)}
-              className="text-xs border border-border-subtle rounded-lg px-2 py-1 bg-bg-base text-text-primary focus:outline-none"
-            >
-              <option value="overall">Overall Risk</option>
-              {BODY_METRICS.map((m) => <option key={m.key} value={m.key}>{m.label}</option>)}
-            </select>
+              onChange={(val) => setSelectedMetric(val)}
+              options={[
+                { value: 'overall', label: 'Overall Risk' },
+                ...BODY_METRICS.map((m) => ({ value: m.key, label: m.label })),
+              ]}
+              className="w-40"
+            />
           </div>
           <ResponsiveContainer width="100%" height={200}>
             <LineChart data={chartData}>

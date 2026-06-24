@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Search, ChevronDown, ChevronUp, Play, AlertTriangle, CheckCircle, Dumbbell } from 'lucide-react'
 import { useStore } from '../store'
+import GlassSelect from '../components/GlassSelect'
 
 const LIBRARY = [
   {
@@ -493,20 +494,18 @@ export default function MovementLibraryScreen() {
             className="w-full pl-9 pr-3 py-2 rounded-xl border border-border-subtle bg-bg-base text-sm text-text-primary focus:outline-none focus:border-accent-primary"
           />
         </div>
-        <select
+        <GlassSelect
           value={category}
-          onChange={(e) => setCategory(e.target.value)}
-          className="px-3 py-2 rounded-xl border border-border-subtle bg-bg-base text-sm text-text-primary focus:outline-none focus:border-accent-primary"
-        >
-          {CATEGORIES.map((c) => <option key={c}>{c}</option>)}
-        </select>
-        <select
+          onChange={(val) => setCategory(val)}
+          options={CATEGORIES}
+          className="w-40"
+        />
+        <GlassSelect
           value={difficulty}
-          onChange={(e) => setDifficulty(e.target.value)}
-          className="px-3 py-2 rounded-xl border border-border-subtle bg-bg-base text-sm text-text-primary focus:outline-none focus:border-accent-primary"
-        >
-          {DIFFICULTIES.map((d) => <option key={d}>{d}</option>)}
-        </select>
+          onChange={(val) => setDifficulty(val)}
+          options={DIFFICULTIES}
+          className="w-36"
+        />
       </div>
 
       {filtered.length === 0 ? (

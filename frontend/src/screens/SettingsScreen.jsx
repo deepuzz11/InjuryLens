@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import { motion } from 'framer-motion'
 import { Settings, User, Database, Bell, Shield, Download, Trash2, ChevronRight, CheckCircle } from 'lucide-react'
 import { useStore } from '../store'
+import GlassSelect from '../components/GlassSelect'
 
 function Toggle({ checked, onChange }) {
   return (
@@ -183,25 +184,23 @@ export default function SettingsScreen() {
       {/* Display */}
       <Section title="Display" icon={Settings}>
         <SettingRow label="Measurement Units" description="Units used in data display">
-          <select
+          <GlassSelect
             value={settings.units ?? 'metric'}
-            onChange={(e) => set('units', e.target.value)}
-            className="text-sm border border-border-subtle rounded-lg px-2 py-1 bg-bg-base text-text-primary focus:outline-none focus:border-accent-primary"
-          >
-            <option value="metric">Metric (kg, cm)</option>
-            <option value="imperial">Imperial (lbs, in)</option>
-          </select>
+            onChange={(val) => set('units', val)}
+            options={[
+              { value: 'metric',   label: 'Metric (kg, cm)' },
+              { value: 'imperial', label: 'Imperial (lbs, in)' },
+            ]}
+            className="w-44"
+          />
         </SettingRow>
         <SettingRow label="Weekly Report Day" description="Day for automated weekly summary">
-          <select
+          <GlassSelect
             value={settings.weeklyReportDay ?? 'Sunday'}
-            onChange={(e) => set('weeklyReportDay', e.target.value)}
-            className="text-sm border border-border-subtle rounded-lg px-2 py-1 bg-bg-base text-text-primary focus:outline-none focus:border-accent-primary"
-          >
-            {['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'].map((d) => (
-              <option key={d}>{d}</option>
-            ))}
-          </select>
+            onChange={(val) => set('weeklyReportDay', val)}
+            options={['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday']}
+            className="w-36"
+          />
         </SettingRow>
       </Section>
 

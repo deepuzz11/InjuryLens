@@ -24,6 +24,26 @@ export default function PDFExportButton({ results, targetRef }) {
         backgroundColor: '#f8fafc',
         logging: false,
         ignoreElements: (el) => el.classList?.contains('pdf-exclude'),
+        onclone: (_doc, clonedEl) => {
+          // html2canvas cannot render <video> — replace each with a neutral placeholder
+          clonedEl.querySelectorAll('video').forEach((v) => {
+            const ph = _doc.createElement('div')
+            ph.style.cssText = [
+              `width:${v.offsetWidth || 320}px`,
+              `height:${v.offsetHeight || 240}px`,
+              'background:#f1f5f9',
+              'border-radius:8px',
+              'display:flex',
+              'align-items:center',
+              'justify-content:center',
+              'color:#94a3b8',
+              'font-size:12px',
+              'font-family:sans-serif',
+            ].join(';')
+            ph.textContent = 'Annotated video — open in app to view'
+            v.replaceWith(ph)
+          })
+        },
       })
 
       const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })

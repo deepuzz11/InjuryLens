@@ -168,6 +168,16 @@ class BiomechanicsEngine:
             })
 
         n = len(frame_flags)
+        if n == 0:
+            return [], {
+                "avg_left_knee_angle": 0.0, "avg_right_knee_angle": 0.0,
+                "avg_trunk_lean_angle": 0.0, "avg_shoulder_asymmetry": 0.0,
+                "worst_frame_index": 0, "best_frame_index": 0, "middle_frame_index": 0,
+                "rep_count": 0, "fatigue_score": 0,
+                "avg_trunk_rotation_3d": 0.0, "avg_hip_rotation_3d": 0.0,
+                "avg_knee_depth_asym_3d": 0.0,
+                "peak_left_knee_velocity": 0.0, "peak_right_knee_velocity": 0.0,
+            }
 
         # Post-loop: compute joint velocity (Δangle/Δframe) and acceleration (Feature 4)
         for i in range(1, n):

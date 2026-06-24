@@ -24,6 +24,8 @@ export default function WebcamRecorder({ onCapture, onClose }) {
   const chunksRef   = useRef([])
   const timerRef    = useRef(null)
   const mimeTypeRef = useRef('')
+  const streamRef   = useRef(null)   // always holds the current live stream
+  const blobUrlRef  = useRef(null)   // always holds the current blob URL
 
   const [phase, setPhase]         = useState('idle')    // idle | recording | preview | error
   const [elapsed, setElapsed]     = useState(0)
@@ -33,19 +35,22 @@ export default function WebcamRecorder({ onCapture, onClose }) {
   const [countdown, setCountdown] = useState(null)
 
   const stopStream = useCallback(() => {
-    stream?.getTracks().forEach((t) => t.stop())
+    streamRef.current?.getTracks().forEach((t) => t.stop())
+    streamRef.current = null
     setStream(null)
-  }, [stream])
+  }, [])
 
   useEffect(() => () => {
-    stopStream()
+    // Use refs so the cleanup always sees the latest values regardless of when it runs
+    streamRef.current?.getTracks().forEach((t) => t.stop())
     clearInterval(timerRef.current)
-    if (blobUrl) URL.revokeObjectURL(blobUrl)
-  }, [])   // eslint-disable-line
+    if (blobUrlRef.current) URL.revokeObjectURL(blobUrlRef.current)
+  }, [])
 
   const startCamera = async () => {
     try {
       const s = await navigator.mediaDevices.getUserMedia({ video: true, audio: false })
+      streamRef.current = s
       setStream(s)
       if (videoRef.current) {
         videoRef.current.srcObject = s
@@ -80,6 +85,7 @@ export default function WebcamRecorder({ onCapture, onClose }) {
       const recordedType = mimeTypeRef.current || 'video/webm'
       const blob = new Blob(chunksRef.current, { type: recordedType })
       const url  = URL.createObjectURL(blob)
+      blobUrlRef.current = url
       setBlobUrl(url)
       if (videoRef.current) {
         videoRef.current.srcObject = null
@@ -120,7 +126,7 @@ export default function WebcamRecorder({ onCapture, onClose }) {
   }
 
   const handleRetry = () => {
-    if (blobUrl) URL.revokeObjectURL(blobUrl)
+    if (blobUrlRef.current) { URL.revokeObjectURL(blobUrlRef.current); blobUrlRef.current = null }
     setBlobUrl(null)
     setElapsed(0)
     setPhase('idle')

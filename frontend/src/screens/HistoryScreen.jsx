@@ -6,6 +6,7 @@ import {
   StickyNote, X, Tag, Search,
 } from 'lucide-react'
 import { useStore } from '../store'
+import GlassSelect from '../components/GlassSelect'
 
 function RiskBadge({ level }) {
   const map = {
@@ -416,13 +417,12 @@ export default function HistoryScreen() {
                 className="w-full pl-8 pr-3 py-2 rounded-xl border border-border-subtle bg-bg-base text-sm text-text-primary focus:outline-none focus:border-accent-primary"
               />
             </div>
-            <select
+            <GlassSelect
               value={riskFilter}
-              onChange={(e) => setRiskFilter(e.target.value)}
-              className="px-3 py-2 rounded-xl border border-border-subtle bg-bg-base text-sm text-text-primary focus:outline-none focus:border-accent-primary"
-            >
-              {['All', 'Low', 'Moderate', 'High'].map((r) => <option key={r}>{r}</option>)}
-            </select>
+              onChange={(val) => setRiskFilter(val)}
+              options={['All', 'Low', 'Moderate', 'High']}
+              className="flex-shrink-0 w-32"
+            />
           </div>
         )}
 

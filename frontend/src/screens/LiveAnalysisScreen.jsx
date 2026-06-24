@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState, useCallback } from 'react'
 import { motion } from 'framer-motion'
 import { Video, Square, AlertTriangle, Activity, RotateCcw, Zap } from 'lucide-react'
 import { useStore } from '../store'
+import GlassSelect from '../components/GlassSelect'
 
 // MediaPipe pose connections for skeleton drawing
 const POSE_CONNECTIONS = [
@@ -238,13 +239,12 @@ export default function LiveAnalysisScreen() {
               <p className="text-sm text-text-secondary mt-0.5">Real-time pose detection — no upload needed</p>
             </div>
             <div className="flex gap-2">
-              <select
+              <GlassSelect
                 value={movement}
-                onChange={(e) => { movementRef.current = e.target.value; setMovement(e.target.value); angleHistRef.current = [] }}
-                className="px-3 py-2 rounded-xl glass border border-border-subtle text-sm text-text-primary bg-transparent focus:outline-none"
-              >
-                {Object.keys(MOVEMENT_THRESHOLDS).map((m) => <option key={m}>{m}</option>)}
-              </select>
+                onChange={(val) => { movementRef.current = val; setMovement(val); angleHistRef.current = [] }}
+                options={Object.keys(MOVEMENT_THRESHOLDS)}
+                className="w-44"
+              />
               {status === 'running'
                 ? <button onClick={stopCamera} className="flex items-center gap-2 px-4 py-2 rounded-xl bg-danger/15 border border-danger/30 text-danger text-sm hover:bg-danger/25 transition-all"><Square size={14} />Stop</button>
                 : <button onClick={startCamera} disabled={status !== 'ready'} className="flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-accent-primary to-accent-secondary text-white text-sm disabled:opacity-50 hover:brightness-110 transition-all"><Video size={14} />{status === 'initializing' ? 'Loading…' : status === 'error' ? 'Error' : 'Start Camera'}</button>

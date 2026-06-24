@@ -523,7 +523,7 @@ export default function UploadScreen() {
             initial={{ opacity: 0, y: 18 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.4, duration: 0.55 }}
-            className="mt-6 glass-premium rounded-2xl p-5"
+            className="mt-6 glass-premium rounded-2xl p-5 relative z-10"
           >
             <p className="flex items-center gap-1.5 text-xs font-medium text-text-secondary mb-4">
               <BarChart3 size={12} aria-hidden />About You
